@@ -1,0 +1,242 @@
+const pool = require('../config/db');
+const { ORDER_BY_PRIORIDADE } = require('../utils/priority');
+
+const PRIORIDADES_VALIDAS = ['urgente', 'alta', 'normal', 'baixa'];
+
+// POST /api/solicitacoes — solicitante ou administrador (RF01)
+async function criar(req, res, next) {
+  try {
+    const { numero_desenho, descricao, quantidade, prioridade, data_prazo, observacoes } = req.body;
+
+    if (!numero_desenho || !quantidade || !data_prazo) {
+      return res.status(400).json({ erro: 'numero_desenho, quantidade e data_prazo são obrigatórios.' });
+    }
+    if (prioridade && !PRIORIDADES_VALIDAS.includes(prioridade)) {
+      return res.status(400).json({ erro: `prioridade deve ser um de: ${PRIORIDADES_VALIDAS.join(', ')}` });
+    }
+
+    // Solicitante é sempre o usuário autenticado, a menos que um administrador
+    // esteja cadastrando em nome de outro solicitante (id_solicitante no corpo).
+    const idSolicitante = req.usuario.perfil === 'administrador' && req.body.id_solicitante
+      ? req.body.id_solicitante
+      : req.usuario.id;
+
+    const { rows } = await pool.query(
+      `INSERT INTO solicitacao
+         (numero_desenho, descricao, quantidade, prioridade, data_prazo, observacoes, id_solicitante)
+       VALUES ($1, $2, $3, $4::prioridade_solicitacao, $5, $6, $7)
+       RETURNING *`,
+      [numero_desenho, descricao || null, quantidade, prioridade || 'normal', data_prazo, observacoes || null, idSolicitante]
+    );
+
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/solicitacoes — lista com filtros opcionais, já ordenada por prioridade (RF06)
+async function listar(req, res, next) {
+  try {
+    const { status, prioridade, id_solicitante } = req.query;
+    const condicoes = [];
+    const valores = [];
+    let i = 1;
+
+    if (status) { condicoes.push(`s.status = $${i++}::status_solicitacao`); valores.push(status); }
+if (prioridade) { condicoes.push(`s.prioridade = $${i++}::prioridade_solicitacao`); valores.push(prioridade); }
+    if (id_solicitante) { condicoes.push(`s.id_solicitante = $${i++}`); valores.push(id_solicitante); }
+
+    // Um solicitante só enxerga as próprias solicitações; admin e operador veem todas.
+    if (req.usuario.perfil === 'solicitante') {
+      condicoes.push(`s.id_solicitante = $${i++}`);
+      valores.push(req.usuario.id);
+    }
+
+    const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';
+
+    const { rows } = await pool.query(
+      `SELECT s.*, u.nome AS nome_solicitante
+       FROM solicitacao s
+       JOIN usuario u ON u.id_usuario = s.id_solicitante
+       ${where}
+       ${ORDER_BY_PRIORIDADE}`,
+      valores
+    );
+
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/solicitacoes/:id — detalhe com processos e histórico (RF08, UC11/UC14)
+async function buscarPorId(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const { rows } = await pool.query(
+      `SELECT s.*, u.nome AS nome_solicitante
+       FROM solicitacao s
+       JOIN usuario u ON u.id_usuario = s.id_solicitante
+       WHERE s.id_solicitacao = $1`,
+      [id]
+    );
+    const solicitacao = rows[0];
+    if (!solicitacao) {
+      return res.status(404).json({ erro: 'Solicitação não encontrada.' });
+    }
+
+    if (req.usuario.perfil === 'solicitante' && solicitacao.id_solicitante !== req.usuario.id) {
+      return res.status(403).json({ erro: 'Sem permissão para visualizar esta solicitação.' });
+    }
+
+    const processos = await pool.query(
+      `SELECT p.*, tp.nome AS nome_tipo_processo, op.nome AS nome_operador
+       FROM processo_solicitacao p
+       JOIN tipo_processo tp ON tp.id_tipo_processo = p.id_tipo_processo
+       LEFT JOIN usuario op ON op.id_usuario = p.id_operador
+       WHERE p.id_solicitacao = $1
+       ORDER BY p.ordem_execucao ASC`,
+      [id]
+    );
+
+    const historico = await pool.query(
+      `SELECT h.*, u.nome AS nome_usuario
+       FROM historico_status h
+       LEFT JOIN usuario u ON u.id_usuario = h.id_usuario
+       WHERE h.entidade = 'solicitacao' AND h.id_entidade = $1
+       ORDER BY h.alterado_em ASC`,
+      [id]
+    );
+
+    res.json({ ...solicitacao, processos: processos.rows, historico: historico.rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// PATCH /api/solicitacoes/:id — edição, incluindo troca de prioridade (RF02, RF05→UC05)
+async function atualizar(req, res, next) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { rows: existentes } = await client.query(
+      'SELECT * FROM solicitacao WHERE id_solicitacao = $1 FOR UPDATE',
+      [id]
+    );
+    const atual = existentes[0];
+    if (!atual) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ erro: 'Solicitação não encontrada.' });
+    }
+
+    const ehDona = atual.id_solicitante === req.usuario.id;
+    const ehAdmin = req.usuario.perfil === 'administrador';
+    if (!ehDona && !ehAdmin) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ erro: 'Apenas o solicitante ou um administrador podem editar.' });
+    }
+    if (atual.status === 'cancelada' || atual.status === 'concluida') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: `Solicitação ${atual.status} não pode ser editada.` });
+    }
+
+    const { descricao, quantidade, prioridade, data_prazo, observacoes } = req.body;
+    if (prioridade && !PRIORIDADES_VALIDAS.includes(prioridade)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: `prioridade deve ser um de: ${PRIORIDADES_VALIDAS.join(', ')}` });
+    }
+
+    const campos = [];
+    const valores = [];
+    let i = 1;
+    if (descricao !== undefined) { campos.push(`descricao = $${i++}`); valores.push(descricao); }
+    if (quantidade !== undefined) { campos.push(`quantidade = $${i++}`); valores.push(quantidade); }
+    if (prioridade !== undefined) { campos.push(`prioridade = $${i++}::prioridade_solicitacao`); valores.push(prioridade); }
+    if (data_prazo !== undefined) { campos.push(`data_prazo = $${i++}`); valores.push(data_prazo); }
+    if (observacoes !== undefined) { campos.push(`observacoes = $${i++}`); valores.push(observacoes); }
+
+    if (campos.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: 'Nenhum campo para atualizar foi informado.' });
+    }
+
+    valores.push(id);
+    const { rows } = await client.query(
+      `UPDATE solicitacao SET ${campos.join(', ')} WHERE id_solicitacao = $${i} RETURNING *`,
+      valores
+    );
+
+    // Registra histórico apenas quando a edição inclui mudança de prioridade,
+    // já que é o campo com regra de negócio de reordenação automática (E04).
+    if (prioridade !== undefined && prioridade !== atual.prioridade) {
+      await client.query(
+        `INSERT INTO historico_status (entidade, id_entidade, status_anterior, status_novo, id_usuario, observacao)
+         VALUES ('solicitacao', $1, $2, $3, $4, 'Alteração de prioridade')`,
+        [id, atual.prioridade, prioridade, req.usuario.id]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json(rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+}
+
+// DELETE /api/solicitacoes/:id — cancelamento lógico (RF02, E03), não exclusão física
+async function cancelar(req, res, next) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { rows: existentes } = await client.query(
+      'SELECT * FROM solicitacao WHERE id_solicitacao = $1 FOR UPDATE',
+      [id]
+    );
+    const atual = existentes[0];
+    if (!atual) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ erro: 'Solicitação não encontrada.' });
+    }
+
+    const ehDona = atual.id_solicitante === req.usuario.id;
+    const ehAdmin = req.usuario.perfil === 'administrador';
+    if (!ehDona && !ehAdmin) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ erro: 'Apenas o solicitante ou um administrador podem cancelar.' });
+    }
+    if (atual.status === 'concluida' || atual.status === 'cancelada') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: `Solicitação já está ${atual.status}.` });
+    }
+
+    const { rows } = await client.query(
+      `UPDATE solicitacao SET status = 'cancelada' WHERE id_solicitacao = $1 RETURNING *`,
+      [id]
+    );
+
+    await client.query(
+      `INSERT INTO historico_status (entidade, id_entidade, status_anterior, status_novo, id_usuario)
+       VALUES ('solicitacao', $1, $2, 'cancelada', $3)`,
+      [id, atual.status, req.usuario.id]
+    );
+
+    await client.query('COMMIT');
+    res.json(rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { criar, listar, buscarPorId, atualizar, cancelar };
