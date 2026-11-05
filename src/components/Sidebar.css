@@ -1,0 +1,122 @@
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--color-primary-dark);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 18px;
+  gap: 24px;
+}
+
+.sidebar__brand {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.sidebar__user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar__user-info strong {
+  font-size: 0.9rem;
+}
+
+.sidebar__user-info span {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.sidebar__link {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.sidebar__link.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.sidebar__link.is-disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.sidebar__link:not(.is-disabled):hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar__logout {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 10px;
+  font-size: 0.85rem;
+}
+
+.sidebar__logout:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .sidebar__user-info span {
+    display: none;
+  }
+
+  .sidebar__nav {
+    flex-direction: row;
+  }
+
+  .sidebar__link {
+    white-space: nowrap;
+  }
+
+  .sidebar__logout {
+    white-space: nowrap;
+  }
+}
