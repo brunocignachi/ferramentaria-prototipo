@@ -1,7 +1,6 @@
 # Sistema de Gerenciamento de Solicitações — Ferramentaria Metalmecânica
 
-Protótipo do TCC de Bruno Cignachi (IFRS Campus Farroupilha, orientação: Prof.
-Rogério Xavier de Azambuja).
+Protótipo do TCC de Bruno Cignachi (IFRS Campus Farroupilha).
 
 | Pasta | Conteúdo | Tecnologias |
 |---|---|---|
