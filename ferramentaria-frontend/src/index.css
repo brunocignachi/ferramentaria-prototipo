@@ -1,0 +1,67 @@
+:root {
+  --color-primary: #16a34a;
+  --color-primary-dark: #0f3d2e;
+  --color-primary-light: #e8f7ef;
+  --color-accent-blue: #2563eb;
+  --color-accent-red: #ef4444;
+  --color-accent-orange: #f59e0b;
+  --color-text: #1f2933;
+  --color-text-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-surface: #ffffff;
+  --color-bg: #f4f6f5;
+
+  --radius-lg: 24px;
+  --radius-md: 14px;
+  --radius-sm: 8px;
+
+  --shadow-card: 0 10px 30px rgba(15, 61, 46, 0.08);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+input,
+select,
+button {
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+/* Layout de duas colunas (sidebar + conteúdo), usado no Dashboard
+   e na tela de Cadastro de Usuário. */
+.dashboard {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+@media (max-width: 900px) {
+  .dashboard {
+    flex-direction: column;
+  }
+}
