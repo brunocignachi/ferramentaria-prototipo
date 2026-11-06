@@ -108,8 +108,9 @@ export default function DashboardPage() {
             </div>
 
             {mostrarForm && (
-              // Depois de criar, segue para o detalhe, onde o roteiro é montado.
-              <NovaSolicitacaoForm onCriado={(criada) => navigate(`/solicitacoes/${criada.id_solicitacao}`)} />
+              <NovaSolicitacaoForm
+                onCriado={(criada, aviso) => navigate(`/solicitacoes/${criada.id_solicitacao}`, { state: { aviso } })}
+              />
             )}
 
             {carregando ? (

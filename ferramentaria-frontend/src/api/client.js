@@ -62,14 +62,17 @@ export async function apiUpload(path, campo, arquivo) {
   return lerResposta(res);
 }
 
-// O download exige o token JWT, então não pode ser um link direto para a API.
-export async function apiDownload(path, nomeArquivo) {
+// Os arquivos exigem o token JWT, então não podem ser um link direto para a API.
+export async function apiArquivo(path) {
   const res = await fetch(`${API_URL}${path}`, { headers: authHeader(getStoredToken()) });
   if (!res.ok) {
     await lerResposta(res);
   }
+  return res.blob();
+}
 
-  const url = URL.createObjectURL(await res.blob());
+export async function apiDownload(path, nomeArquivo) {
+  const url = URL.createObjectURL(await apiArquivo(path));
   const link = document.createElement('a');
   link.href = url;
   link.download = nomeArquivo;

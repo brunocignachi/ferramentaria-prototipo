@@ -460,4 +460,4 @@ async function concluir(req, res, next) {
   }
 }
 
-module.exports = { adicionar, reordenar, fila, atribuir, iniciar, concluir };
+module.exports = { adicionar, reordenar, fila, atribuir, iniciar, concluir, operadorValido };

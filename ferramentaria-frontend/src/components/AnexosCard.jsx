@@ -1,20 +1,14 @@
 import { useRef, useState } from 'react';
 import { apiDownload, apiRequest, apiUpload } from '../api/client';
-import { formatarDataHora } from '../utils/solicitacao';
-
-const FORMATOS_ACEITOS = '.pdf,.png,.jpg,.jpeg,.tif,.tiff,.dwg,.dxf,.step,.stp,.iges,.igs';
-
-function formatarTamanho(bytes) {
-  const valor = Number(bytes);
-  if (valor < 1024 * 1024) return `${Math.max(1, Math.round(valor / 1024))} KB`;
-  return `${(valor / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
-}
+import VisualizadorAnexo from './VisualizadorAnexo';
+import { FORMATOS_ANEXO, formatarDataHora, formatarTamanho, tipoVisualizavel } from '../utils/solicitacao';
 
 // Desenhos técnicos da solicitação (RF03, UC06).
 export default function AnexosCard({ idSolicitacao, anexos, podeEditar, onAlterado }) {
   const entradaArquivo = useRef(null);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
+  const [emVisualizacao, setEmVisualizacao] = useState(null);
 
   async function executar(acao) {
     setOcupado(true);
@@ -58,7 +52,7 @@ export default function AnexosCard({ idSolicitacao, anexos, podeEditar, onAltera
             <input
               ref={entradaArquivo}
               type="file"
-              accept={FORMATOS_ACEITOS}
+              accept={FORMATOS_ANEXO}
               disabled={ocupado}
               onChange={enviar}
             />
@@ -80,6 +74,16 @@ export default function AnexosCard({ idSolicitacao, anexos, podeEditar, onAltera
                 </small>
               </div>
               <div className="anexos__acoes">
+                {tipoVisualizavel(anexo.nome_arquivo) && (
+                  <button
+                    type="button"
+                    className="btn btn--primario"
+                    aria-label={`Visualizar ${anexo.nome_arquivo}`}
+                    onClick={() => setEmVisualizacao(anexo)}
+                  >
+                    Visualizar
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn"
@@ -102,6 +106,8 @@ export default function AnexosCard({ idSolicitacao, anexos, podeEditar, onAltera
       )}
 
       {erro && <p className="field-error">{erro}</p>}
+
+      {emVisualizacao && <VisualizadorAnexo anexo={emVisualizacao} onFechar={() => setEmVisualizacao(null)} />}
     </section>
   );
 }
