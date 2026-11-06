@@ -1,27 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import ProgressRing from '../components/ProgressRing';
 import NovaSolicitacaoForm from '../components/NovaSolicitacaoForm';
+import {
+  PRIORIDADE_COR,
+  PRIORIDADE_LABEL,
+  STATUS_SOLICITACAO_LABEL,
+  formatarData,
+  formatarPrazo,
+} from '../utils/solicitacao';
 import './DashboardPage.css';
-
-const PRIORIDADE_LABEL = { urgente: 'Urgente', alta: 'Alta', normal: 'Normal', baixa: 'Baixa' };
-const STATUS_LABEL = {
-  aberta: 'A fazer',
-  em_andamento: 'Em progresso',
-  concluida: 'Completo',
-  cancelada: 'Cancelada',
-};
-const PRIORIDADE_COR = { urgente: '#ef4444', alta: '#f59e0b', normal: '#2563eb', baixa: '#9ca3af' };
-
-function formatarData(valor) {
-  if (!valor) return '—';
-  return new Date(valor).toLocaleDateString('pt-BR');
-}
+import '../styles/Solicitacoes.css';
 
 export default function DashboardPage() {
   const { usuario } = useAuth();
+  const navigate = useNavigate();
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
@@ -112,12 +108,8 @@ export default function DashboardPage() {
             </div>
 
             {mostrarForm && (
-              <NovaSolicitacaoForm
-                onCriado={() => {
-                  setMostrarForm(false);
-                  carregarSolicitacoes();
-                }}
-              />
+              // Depois de criar, segue para o detalhe, onde o roteiro é montado.
+              <NovaSolicitacaoForm onCriado={(criada) => navigate(`/solicitacoes/${criada.id_solicitacao}`)} />
             )}
 
             {carregando ? (
@@ -130,11 +122,15 @@ export default function DashboardPage() {
                   <li key={s.id_solicitacao} className="task-list__item">
                     <span className="task-list__dot" style={{ background: PRIORIDADE_COR[s.prioridade] }} />
                     <div className="task-list__body">
-                      <strong>{s.numero_desenho}</strong>
+                      <strong>
+                        <Link className="task-link" to={`/solicitacoes/${s.id_solicitacao}`}>
+                          {s.numero_desenho}
+                        </Link>
+                      </strong>
                       <span>{s.descricao || 'Sem descrição'}</span>
                       <small>
-                        Prioridade: {PRIORIDADE_LABEL[s.prioridade]} · Status: {STATUS_LABEL[s.status]} · Prazo:{' '}
-                        {formatarData(s.data_prazo)}
+                        Prioridade: {PRIORIDADE_LABEL[s.prioridade]} · Status: {STATUS_SOLICITACAO_LABEL[s.status]} ·
+                        Prazo: {formatarPrazo(s.data_prazo)}
                       </small>
                     </div>
                   </li>
@@ -161,7 +157,11 @@ export default function DashboardPage() {
                 <ul className="done-list">
                   {concluidas.map((s) => (
                     <li key={s.id_solicitacao}>
-                      <strong>{s.numero_desenho}</strong>
+                      <strong>
+                        <Link className="task-link" to={`/solicitacoes/${s.id_solicitacao}`}>
+                          {s.numero_desenho}
+                        </Link>
+                      </strong>
                       <span>Quantidade: {s.quantidade}</span>
                       <small>Concluída em {formatarData(s.data_conclusao)}</small>
                     </li>

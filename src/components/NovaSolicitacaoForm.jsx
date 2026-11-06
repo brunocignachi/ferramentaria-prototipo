@@ -21,7 +21,7 @@ export default function NovaSolicitacaoForm({ onCriado }) {
     setErro('');
     setEnviando(true);
     try {
-      await apiRequest('/solicitacoes', {
+      const criada = await apiRequest('/solicitacoes', {
         method: 'POST',
         body: {
           numero_desenho: numeroDesenho,
@@ -36,7 +36,7 @@ export default function NovaSolicitacaoForm({ onCriado }) {
       setQuantidade(1);
       setPrioridade('normal');
       setDataPrazo('');
-      onCriado();
+      onCriado(criada);
     } catch (err) {
       setErro(err.message);
     } finally {

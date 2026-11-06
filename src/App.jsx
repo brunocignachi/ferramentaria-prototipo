@@ -4,6 +4,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import CadastrarUsuarioPage from './pages/CadastrarUsuarioPage';
+import FilaPage from './pages/FilaPage';
+import SolicitacoesPage from './pages/SolicitacoesPage';
+import SolicitacaoDetalhePage from './pages/SolicitacaoDetalhePage';
 
 export default function App() {
   return (
@@ -26,6 +29,33 @@ export default function App() {
             element={
               <ProtectedRoute perfis={['administrador']}>
                 <CadastrarUsuarioPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/solicitacoes"
+            element={
+              <ProtectedRoute>
+                <SolicitacoesPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/solicitacoes/:id"
+            element={
+              <ProtectedRoute>
+                <SolicitacaoDetalhePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/fila"
+            element={
+              <ProtectedRoute perfis={['operador', 'administrador']}>
+                <FilaPage />
               </ProtectedRoute>
             }
           />

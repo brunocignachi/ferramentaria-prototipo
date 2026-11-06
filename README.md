@@ -18,6 +18,9 @@ Reproduz as 3 telas do protótipo (Figma — seção 7.1.6 do artigo) já conect
 | Login | `/login` | Público | Figura 2 |
 | Dashboard | `/` | Qualquer usuário autenticado | Figura 3 |
 | Cadastrar usuário | `/usuarios/novo` | Apenas perfil `administrador` | Figura 1 (repaginada) |
+| Solicitações e histórico de concluídas | `/solicitacoes` | Qualquer usuário autenticado | — |
+| Detalhe: dados, roteiro e histórico | `/solicitacoes/:id` | Qualquer usuário autenticado (solicitante vê só as próprias) | — |
+| Tarefas (fila por processo) | `/fila` | Perfis `operador` e `administrador` | — |
 
 **Nota sobre a tela de cadastro:** no protótipo original, a Figura 1 é um
 auto-cadastro público ("Registrar"). O backend, porém, só permite criação de
@@ -55,17 +58,24 @@ ferramentaria-frontend/
     │   ├── Sidebar.jsx          # navegação lateral (Figura 3)
     │   ├── ProgressRing.jsx     # anéis de progresso do card "Situação Atual"
     │   ├── NovaSolicitacaoForm.jsx
-    │   └── Illustrations.jsx    # ilustrações SVG originais (telas de auth)
+    │   ├── Illustrations.jsx    # ilustrações SVG originais (telas de auth)
+    │   ├── EditarSolicitacaoForm.jsx
+    │   ├── RoteiroCard.jsx      # etapas: ordem, operador, iniciar e concluir
+    │   └── HistoricoCard.jsx
     ├── pages/
     │   ├── LoginPage.jsx
     │   ├── DashboardPage.jsx
-    │   └── CadastrarUsuarioPage.jsx
-    └── styles/AuthLayout.css    # layout compartilhado por Login e Cadastro
+    │   ├── CadastrarUsuarioPage.jsx
+    │   ├── SolicitacoesPage.jsx
+    │   ├── SolicitacaoDetalhePage.jsx
+    │   └── FilaPage.jsx
+    ├── utils/solicitacao.js     # rótulos, datas e regra de quem atua na etapa
+    └── styles/
+        ├── AuthLayout.css       # layout compartilhado por Login e Cadastro
+        └── Solicitacoes.css     # solicitações, roteiro, histórico e fila
 ```
 
 ## O que falta para fechar o escopo do artigo
 
-Funcionalidades previstas no artigo (RF03 anexos, RF09 relatórios, RF08/UC14
-consulta de histórico, UC09/UC12 fila por processo) ainda não têm endpoint no
-back-end, então não foram implementadas no front — ficaram como itens
-desativados ("Em breve") na barra lateral até existir API correspondente.
+Ainda sem tela: gestão de usuários além do cadastro (RF10) e tipos de processo
+(RF11). Ainda sem tela nem endpoint: anexos (RF03) e relatórios (RF09).
