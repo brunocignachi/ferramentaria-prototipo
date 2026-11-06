@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { apiRequest } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -21,6 +21,7 @@ export default function SolicitacaoDetalhePage() {
   const { id } = useParams();
   const { usuario } = useAuth();
   const navigate = useNavigate();
+  const { state: estadoDaNavegacao } = useLocation();
   const [solicitacao, setSolicitacao] = useState(null);
   const [tipos, setTipos] = useState([]);
   const [operadores, setOperadores] = useState([]);
@@ -99,6 +100,7 @@ export default function SolicitacaoDetalhePage() {
           ← Voltar às solicitações
         </Link>
 
+        {estadoDaNavegacao?.aviso && <p className="aviso">{estadoDaNavegacao.aviso}</p>}
         {erro && <p className="dashboard__error">{erro}</p>}
         {carregando && <p className="card__empty">Carregando...</p>}
 
@@ -203,6 +205,14 @@ export default function SolicitacaoDetalhePage() {
             />
 
             <HistoricoCard historico={solicitacao.historico} />
+
+            {precisaDeOpcoes && (
+              <div className="form-acoes">
+                <Link to="/" className="btn btn--primario btn--link">
+                  Concluir e voltar
+                </Link>
+              </div>
+            )}
           </>
         )}
       </main>

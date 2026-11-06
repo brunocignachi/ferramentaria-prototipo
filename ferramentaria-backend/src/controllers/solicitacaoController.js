@@ -1,19 +1,26 @@
 const pool = require('../config/db');
 const { ORDER_BY_PRIORIDADE } = require('../utils/priority');
 const { removerArquivo } = require('../middleware/upload');
+const { operadorValido } = require('./processoController');
 
 const PRIORIDADES_VALIDAS = ['urgente', 'alta', 'normal', 'baixa'];
 
-// POST /api/solicitacoes — solicitante ou administrador (RF01)
+// POST /api/solicitacoes — solicitante ou administrador (RF01). Pode receber o
+// roteiro em "processos", na ordem de execução: a solicitação e as etapas são
+// gravadas juntas, para nunca ficar um roteiro pela metade (RF04).
 async function criar(req, res, next) {
+  const client = await pool.connect();
   try {
-    const { numero_desenho, descricao, quantidade, prioridade, data_prazo, observacoes } = req.body;
+    const { numero_desenho, descricao, quantidade, prioridade, data_prazo, observacoes, processos = [] } = req.body;
 
     if (!numero_desenho || !quantidade || !data_prazo) {
       return res.status(400).json({ erro: 'numero_desenho, quantidade e data_prazo são obrigatórios.' });
     }
     if (prioridade && !PRIORIDADES_VALIDAS.includes(prioridade)) {
       return res.status(400).json({ erro: `prioridade deve ser um de: ${PRIORIDADES_VALIDAS.join(', ')}` });
+    }
+    if (!Array.isArray(processos) || processos.some((etapa) => !etapa?.id_tipo_processo)) {
+      return res.status(400).json({ erro: 'processos deve ser uma lista de etapas com id_tipo_processo.' });
     }
 
     // Solicitante é sempre o usuário autenticado, a menos que um administrador
@@ -22,7 +29,24 @@ async function criar(req, res, next) {
       ? req.body.id_solicitante
       : req.usuario.id;
 
-    const { rows } = await pool.query(
+    await client.query('BEGIN');
+
+    for (const etapa of processos) {
+      const { rows: tipos } = await client.query(
+        'SELECT 1 FROM tipo_processo WHERE id_tipo_processo = $1 AND ativo = TRUE',
+        [etapa.id_tipo_processo]
+      );
+      if (tipos.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ erro: 'O roteiro contém um tipo de processo inexistente ou inativo.' });
+      }
+      if (etapa.id_operador && !(await operadorValido(client, etapa.id_operador))) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ erro: 'id_operador deve ser um usuário ativo com perfil de operador.' });
+      }
+    }
+
+    const { rows } = await client.query(
       `INSERT INTO solicitacao
          (numero_desenho, descricao, quantidade, prioridade, data_prazo, observacoes, id_solicitante)
        VALUES ($1, $2, $3, $4::prioridade_solicitacao, $5, $6, $7)
@@ -30,9 +54,24 @@ async function criar(req, res, next) {
       [numero_desenho, descricao || null, quantidade, prioridade || 'normal', data_prazo, observacoes || null, idSolicitante]
     );
 
-    res.status(201).json(rows[0]);
+    const etapasCriadas = [];
+    for (const [indice, etapa] of processos.entries()) {
+      const { rows: criada } = await client.query(
+        `INSERT INTO processo_solicitacao (ordem_execucao, id_solicitacao, id_tipo_processo, id_operador)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *`,
+        [indice + 1, rows[0].id_solicitacao, etapa.id_tipo_processo, etapa.id_operador || null]
+      );
+      etapasCriadas.push(criada[0]);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ ...rows[0], processos: etapasCriadas });
   } catch (err) {
+    await client.query('ROLLBACK');
     next(err);
+  } finally {
+    client.release();
   }
 }
 

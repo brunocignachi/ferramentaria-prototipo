@@ -1,3 +1,39 @@
+export const FORMATOS_ANEXO = '.pdf,.png,.jpg,.jpeg,.tif,.tiff,.dwg,.dxf,.step,.stp,.iges,.igs';
+const TAMANHO_MAXIMO_ANEXO_MB = 20;
+
+// Só o que o navegador sabe exibir: CAD e TIFF continuam disponíveis para download.
+const TIPOS_VISUALIZAVEIS = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+};
+
+function extensaoDe(nomeArquivo) {
+  return nomeArquivo.split('.').pop().toLowerCase();
+}
+
+export function tipoVisualizavel(nomeArquivo) {
+  return TIPOS_VISUALIZAVEIS[extensaoDe(nomeArquivo)] ?? null;
+}
+
+// Mesmas regras da API, para avisar antes de enviar. Retorna a mensagem de erro, se houver.
+export function validarArquivo(arquivo) {
+  if (!FORMATOS_ANEXO.split(',').includes(`.${extensaoDe(arquivo.name)}`)) {
+    return `Formato não permitido: ${arquivo.name}`;
+  }
+  if (arquivo.size > TAMANHO_MAXIMO_ANEXO_MB * 1024 * 1024) {
+    return `${arquivo.name} excede o limite de ${TAMANHO_MAXIMO_ANEXO_MB} MB.`;
+  }
+  return '';
+}
+
+export function formatarTamanho(bytes) {
+  const valor = Number(bytes);
+  if (valor < 1024 * 1024) return `${Math.max(1, Math.round(valor / 1024))} KB`;
+  return `${(valor / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+}
+
 export const PRIORIDADE_LABEL = { urgente: 'Urgente', alta: 'Alta', normal: 'Normal', baixa: 'Baixa' };
 export const PRIORIDADE_COR = { urgente: '#ef4444', alta: '#f59e0b', normal: '#2563eb', baixa: '#9ca3af' };
 

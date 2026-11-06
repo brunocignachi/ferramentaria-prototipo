@@ -65,7 +65,8 @@ ferramentaria-frontend/
     │   ├── EditarSolicitacaoForm.jsx
     │   ├── RoteiroCard.jsx      # etapas: ordem, operador, iniciar e concluir
     │   ├── HistoricoCard.jsx
-    │   └── AnexosCard.jsx
+    │   ├── AnexosCard.jsx
+    │   └── VisualizadorAnexo.jsx # exibe PDF e imagem dentro do site
     ├── pages/
     │   ├── LoginPage.jsx
     │   ├── DashboardPage.jsx
