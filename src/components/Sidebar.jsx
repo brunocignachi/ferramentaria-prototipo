@@ -52,9 +52,17 @@ export default function Sidebar() {
         </Link>
 
         {usuario?.perfil === 'administrador' && (
-          <Link to="/usuarios/novo" className={classeDoLink(pathname === '/usuarios/novo')}>
-            Cadastrar usuário
-          </Link>
+          <>
+            <Link to="/relatorios" className={classeDoLink(pathname === '/relatorios')}>
+              Relatórios
+            </Link>
+            <Link to="/usuarios" className={classeDoLink(pathname.startsWith('/usuarios'))}>
+              Usuários
+            </Link>
+            <Link to="/tipos-processo" className={classeDoLink(pathname === '/tipos-processo')}>
+              Tipos de processo
+            </Link>
+          </>
         )}
 
         {ITENS_FUTUROS.map((item) => (

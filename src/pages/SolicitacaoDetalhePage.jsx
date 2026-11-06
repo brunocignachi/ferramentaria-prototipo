@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { apiRequest } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import EditarSolicitacaoForm from '../components/EditarSolicitacaoForm';
 import RoteiroCard from '../components/RoteiroCard';
 import HistoricoCard from '../components/HistoricoCard';
+import AnexosCard from '../components/AnexosCard';
 import {
   PRIORIDADE_LABEL,
   STATUS_SOLICITACAO_LABEL,
@@ -19,6 +20,7 @@ import '../styles/Solicitacoes.css';
 export default function SolicitacaoDetalhePage() {
   const { id } = useParams();
   const { usuario } = useAuth();
+  const navigate = useNavigate();
   const [solicitacao, setSolicitacao] = useState(null);
   const [tipos, setTipos] = useState([]);
   const [operadores, setOperadores] = useState([]);
@@ -71,6 +73,23 @@ export default function SolicitacaoDetalhePage() {
     }
   }
 
+  // RN03: exclusão física, restrita ao administrador.
+  async function excluirPermanentemente() {
+    if (
+      !window.confirm(
+        'Excluir permanentemente esta solicitação, com etapas, histórico e anexos? Os dados não poderão ser recuperados.'
+      )
+    ) {
+      return;
+    }
+    try {
+      await apiRequest(`/solicitacoes/${id}/permanente`, { method: 'DELETE' });
+      navigate('/solicitacoes', { replace: true });
+    } catch (err) {
+      setErro(err.message);
+    }
+  }
+
   return (
     <div className="dashboard">
       <Sidebar />
@@ -93,14 +112,23 @@ export default function SolicitacaoDetalhePage() {
                 </span>
               </div>
 
-              {podeGerenciar && ativa && !editando && (
+              {!editando && (
                 <div className="detalhe__acoes">
-                  <button type="button" className="btn" onClick={() => setEditando(true)}>
-                    Editar
-                  </button>
-                  <button type="button" className="btn btn--perigo" onClick={cancelarSolicitacao}>
-                    Cancelar solicitação
-                  </button>
+                  {podeGerenciar && ativa && (
+                    <>
+                      <button type="button" className="btn" onClick={() => setEditando(true)}>
+                        Editar
+                      </button>
+                      <button type="button" className="btn btn--perigo" onClick={cancelarSolicitacao}>
+                        Cancelar solicitação
+                      </button>
+                    </>
+                  )}
+                  {usuario?.perfil === 'administrador' && (
+                    <button type="button" className="btn btn--perigo" onClick={excluirPermanentemente}>
+                      Excluir permanentemente
+                    </button>
+                  )}
                 </div>
               )}
             </header>
@@ -157,6 +185,13 @@ export default function SolicitacaoDetalhePage() {
                 </dl>
               )}
             </section>
+
+            <AnexosCard
+              idSolicitacao={solicitacao.id_solicitacao}
+              anexos={solicitacao.anexos}
+              podeEditar={precisaDeOpcoes}
+              onAlterado={carregar}
+            />
 
             <RoteiroCard
               solicitacao={solicitacao}

@@ -21,6 +21,9 @@ Reproduz as 3 telas do protótipo (Figma — seção 7.1.6 do artigo) já conect
 | Solicitações e histórico de concluídas | `/solicitacoes` | Qualquer usuário autenticado | — |
 | Detalhe: dados, roteiro e histórico | `/solicitacoes/:id` | Qualquer usuário autenticado (solicitante vê só as próprias) | — |
 | Tarefas (fila por processo) | `/fila` | Perfis `operador` e `administrador` | — |
+| Usuários | `/usuarios` | Apenas perfil `administrador` | — |
+| Tipos de processo | `/tipos-processo` | Apenas perfil `administrador` | — |
+| Relatórios com OTD | `/relatorios` | Apenas perfil `administrador` | — |
 
 **Nota sobre a tela de cadastro:** no protótipo original, a Figura 1 é um
 auto-cadastro público ("Registrar"). O backend, porém, só permite criação de
@@ -61,21 +64,20 @@ ferramentaria-frontend/
     │   ├── Illustrations.jsx    # ilustrações SVG originais (telas de auth)
     │   ├── EditarSolicitacaoForm.jsx
     │   ├── RoteiroCard.jsx      # etapas: ordem, operador, iniciar e concluir
-    │   └── HistoricoCard.jsx
+    │   ├── HistoricoCard.jsx
+    │   └── AnexosCard.jsx
     ├── pages/
     │   ├── LoginPage.jsx
     │   ├── DashboardPage.jsx
     │   ├── CadastrarUsuarioPage.jsx
     │   ├── SolicitacoesPage.jsx
     │   ├── SolicitacaoDetalhePage.jsx
-    │   └── FilaPage.jsx
+    │   ├── FilaPage.jsx
+    │   ├── UsuariosPage.jsx
+    │   ├── TiposProcessoPage.jsx
+    │   └── RelatoriosPage.jsx
     ├── utils/solicitacao.js     # rótulos, datas e regra de quem atua na etapa
     └── styles/
         ├── AuthLayout.css       # layout compartilhado por Login e Cadastro
         └── Solicitacoes.css     # solicitações, roteiro, histórico e fila
 ```
-
-## O que falta para fechar o escopo do artigo
-
-Ainda sem tela: gestão de usuários além do cadastro (RF10) e tipos de processo
-(RF11). Ainda sem tela nem endpoint: anexos (RF03) e relatórios (RF09).

@@ -131,8 +131,8 @@ export default function CadastrarUsuarioPage() {
               </button>
             </form>
 
-            <Link to="/" className="auth-card__hint">
-              ← Voltar ao Dashboard
+            <Link to="/usuarios" className="auth-card__hint">
+              ← Voltar aos usuários
             </Link>
           </div>
 

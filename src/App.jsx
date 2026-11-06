@@ -7,6 +7,9 @@ import CadastrarUsuarioPage from './pages/CadastrarUsuarioPage';
 import FilaPage from './pages/FilaPage';
 import SolicitacoesPage from './pages/SolicitacoesPage';
 import SolicitacaoDetalhePage from './pages/SolicitacaoDetalhePage';
+import UsuariosPage from './pages/UsuariosPage';
+import TiposProcessoPage from './pages/TiposProcessoPage';
+import RelatoriosPage from './pages/RelatoriosPage';
 
 export default function App() {
   return (
@@ -56,6 +59,33 @@ export default function App() {
             element={
               <ProtectedRoute perfis={['operador', 'administrador']}>
                 <FilaPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/usuarios"
+            element={
+              <ProtectedRoute perfis={['administrador']}>
+                <UsuariosPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/tipos-processo"
+            element={
+              <ProtectedRoute perfis={['administrador']}>
+                <TiposProcessoPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/relatorios"
+            element={
+              <ProtectedRoute perfis={['administrador']}>
+                <RelatoriosPage />
               </ProtectedRoute>
             }
           />
