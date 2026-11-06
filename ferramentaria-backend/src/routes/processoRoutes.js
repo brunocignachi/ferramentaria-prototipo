@@ -8,7 +8,7 @@ router.use(autenticar);
 
 router.get('/fila', processoController.fila);
 
-router.patch('/:id/atribuir', autorizar('administrador'), processoController.atribuir);
+router.patch('/:id/atribuir', autorizar('solicitante', 'administrador'), processoController.atribuir);
 
 router.patch('/:id/iniciar', autorizar('operador', 'administrador'), processoController.iniciar);
 

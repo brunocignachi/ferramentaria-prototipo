@@ -7,6 +7,7 @@ const router = express.Router();
 router.use(autenticar);
 
 router.get('/', autorizar('administrador'), usuarioController.listar);
+router.get('/operadores', autorizar('solicitante', 'administrador'), usuarioController.listarOperadores);
 router.post('/', autorizar('administrador'), usuarioController.criar);
 router.patch('/:id', autorizar('administrador'), usuarioController.atualizar);
 router.delete('/:id', autorizar('administrador'), usuarioController.excluir);

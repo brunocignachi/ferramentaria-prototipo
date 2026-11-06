@@ -101,12 +101,17 @@ async function buscarPorId(req, res, next) {
       [id]
     );
 
+    // Histórico completo da peça: mudanças da solicitação e de cada etapa (RF08, H2).
     const historico = await pool.query(
-      `SELECT h.*, u.nome AS nome_usuario
+      `SELECT h.*, u.nome AS nome_usuario, p.ordem_execucao, tp.nome AS nome_tipo_processo
        FROM historico_status h
        LEFT JOIN usuario u ON u.id_usuario = h.id_usuario
-       WHERE h.entidade = 'solicitacao' AND h.id_entidade = $1
-       ORDER BY h.alterado_em ASC`,
+       LEFT JOIN processo_solicitacao p
+         ON h.entidade = 'processo' AND p.id_processo = h.id_entidade
+       LEFT JOIN tipo_processo tp ON tp.id_tipo_processo = p.id_tipo_processo
+       WHERE (h.entidade = 'solicitacao' AND h.id_entidade = $1)
+          OR (h.entidade = 'processo' AND p.id_solicitacao = $1)
+       ORDER BY h.alterado_em ASC, h.id_historico ASC`,
       [id]
     );
 
@@ -116,7 +121,7 @@ async function buscarPorId(req, res, next) {
   }
 }
 
-// PATCH /api/solicitacoes/:id — edição, incluindo troca de prioridade (RF02, RF05→UC05)
+// PATCH /api/solicitacoes/:id — edição, incluindo troca de prioridade (RF02, UC05)
 async function atualizar(req, res, next) {
   const client = await pool.connect();
   try {
@@ -144,15 +149,20 @@ async function atualizar(req, res, next) {
       return res.status(400).json({ erro: `Solicitação ${atual.status} não pode ser editada.` });
     }
 
-    const { descricao, quantidade, prioridade, data_prazo, observacoes } = req.body;
+    const { numero_desenho, descricao, quantidade, prioridade, data_prazo, observacoes } = req.body;
     if (prioridade && !PRIORIDADES_VALIDAS.includes(prioridade)) {
       await client.query('ROLLBACK');
       return res.status(400).json({ erro: `prioridade deve ser um de: ${PRIORIDADES_VALIDAS.join(', ')}` });
+    }
+    if (numero_desenho !== undefined && !numero_desenho) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: 'numero_desenho não pode ficar vazio.' });
     }
 
     const campos = [];
     const valores = [];
     let i = 1;
+    if (numero_desenho !== undefined) { campos.push(`numero_desenho = $${i++}`); valores.push(numero_desenho); }
     if (descricao !== undefined) { campos.push(`descricao = $${i++}`); valores.push(descricao); }
     if (quantidade !== undefined) { campos.push(`quantidade = $${i++}`); valores.push(quantidade); }
     if (prioridade !== undefined) { campos.push(`prioridade = $${i++}::prioridade_solicitacao`); valores.push(prioridade); }
@@ -227,6 +237,20 @@ async function cancelar(req, res, next) {
       `INSERT INTO historico_status (entidade, id_entidade, status_anterior, status_novo, id_usuario)
        VALUES ('solicitacao', $1, $2, 'cancelada', $3)`,
       [id, atual.status, req.usuario.id]
+    );
+
+    // As etapas ainda abertas são canceladas junto, com registro no histórico.
+    await client.query(
+      `INSERT INTO historico_status (entidade, id_entidade, status_anterior, status_novo, id_usuario, observacao)
+       SELECT 'processo'::entidade_historico, id_processo, status::varchar, 'cancelado', $2, 'Cancelado junto com a solicitação'
+       FROM processo_solicitacao
+       WHERE id_solicitacao = $1 AND status IN ('pendente', 'em_andamento')`,
+      [id, req.usuario.id]
+    );
+    await client.query(
+      `UPDATE processo_solicitacao SET status = 'cancelado'
+       WHERE id_solicitacao = $1 AND status IN ('pendente', 'em_andamento')`,
+      [id]
     );
 
     await client.query('COMMIT');

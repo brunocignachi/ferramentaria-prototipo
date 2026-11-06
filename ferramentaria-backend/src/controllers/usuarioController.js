@@ -40,6 +40,20 @@ async function listar(req, res, next) {
   }
 }
 
+// GET /api/usuarios/operadores — opções para atribuir etapas; expõe só id e nome.
+async function listarOperadores(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id_usuario, nome FROM usuario
+       WHERE perfil = 'operador' AND ativo = TRUE
+       ORDER BY nome ASC`
+    );
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function atualizar(req, res, next) {
   try {
     const { id } = req.params;
@@ -96,4 +110,4 @@ async function excluir(req, res, next) {
   }
 }
 
-module.exports = { criar, listar, atualizar, excluir };
+module.exports = { criar, listar, listarOperadores, atualizar, excluir };

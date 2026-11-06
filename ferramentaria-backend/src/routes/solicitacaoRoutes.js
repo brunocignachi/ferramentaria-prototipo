@@ -11,6 +11,7 @@ router.get('/', solicitacaoController.listar);
 router.get('/:id', solicitacaoController.buscarPorId);
 router.patch('/:id', autorizar('solicitante', 'administrador'), solicitacaoController.atualizar);
 router.delete('/:id', autorizar('solicitante', 'administrador'), solicitacaoController.cancelar);
-router.post('/:id/processos', autorizar('administrador'), processoController.adicionar);
+router.post('/:id/processos', autorizar('solicitante', 'administrador'), processoController.adicionar);
+router.put('/:id/processos/ordem', autorizar('solicitante', 'administrador'), processoController.reordenar);
 
 module.exports = router;
