@@ -205,6 +205,14 @@ export default function SolicitacaoDetalhePage() {
             />
 
             <HistoricoCard historico={solicitacao.historico} />
+
+            {precisaDeOpcoes && (
+              <div className="form-acoes">
+                <Link to="/" className="btn btn--primario btn--link">
+                  Concluir e voltar
+                </Link>
+              </div>
+            )}
           </>
         )}
       </main>

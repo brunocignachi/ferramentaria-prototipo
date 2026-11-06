@@ -38,12 +38,14 @@ export default function NovaSolicitacaoForm({ onCriado }) {
 
   function incluirEtapa() {
     const tipo = tipos.find((t) => t.id_tipo_processo === Number(idTipo));
-    if (!tipo) return;
+    if (!tipo) return etapas;
     const operador = operadores.find((op) => op.id_usuario === Number(idOperador));
     proximaChave.current += 1;
-    setEtapas((atuais) => [...atuais, { chave: proximaChave.current, tipo, operador }]);
+    const novas = [...etapas, { chave: proximaChave.current, tipo, operador }];
+    setEtapas(novas);
     setIdTipo('');
     setIdOperador('');
+    return novas;
   }
 
   function moverEtapa(indice, deslocamento) {
@@ -66,6 +68,8 @@ export default function NovaSolicitacaoForm({ onCriado }) {
     event.preventDefault();
     setErro('');
     setEnviando(true);
+    // Um processo escolhido sem clicar em "Incluir etapa" também entra no roteiro.
+    const roteiro = incluirEtapa();
     try {
       const criada = await apiRequest('/solicitacoes', {
         method: 'POST',
@@ -76,7 +80,7 @@ export default function NovaSolicitacaoForm({ onCriado }) {
           prioridade,
           data_prazo: dataPrazo,
           observacoes: observacoes || undefined,
-          processos: etapas.map(({ tipo, operador }) => ({
+          processos: roteiro.map(({ tipo, operador }) => ({
             id_tipo_processo: tipo.id_tipo_processo,
             ...(operador ? { id_operador: operador.id_usuario } : {}),
           })),
@@ -250,7 +254,7 @@ export default function NovaSolicitacaoForm({ onCriado }) {
       {erro && <p className="field-error">{erro}</p>}
 
       <button type="submit" className="btn-primary" disabled={enviando}>
-        {enviando ? 'Salvando...' : 'Salvar solicitação'}
+        {enviando ? 'Salvando...' : 'Concluir cadastro'}
       </button>
     </form>
   );
