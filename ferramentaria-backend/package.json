@@ -7,7 +7,15 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "db:migrate": "node db/migrate.js",
-    "db:seed": "node db/seed.js"
+    "db:seed": "node db/seed.js",
+    "db:backup": "node db/backup.js",
+    "db:restore": "node db/restore.js"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "backups/*",
+      "uploads/*"
+    ]
   },
   "keywords": [
     "ferramentaria",
@@ -23,6 +31,7 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "multer": "^2.0.2",
     "pg": "^8.12.0"
   },
   "devDependencies": {

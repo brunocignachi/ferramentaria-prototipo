@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { ORDER_BY_PRIORIDADE } = require('../utils/priority');
+const { removerArquivo } = require('../middleware/upload');
 
 const PRIORIDADES_VALIDAS = ['urgente', 'alta', 'normal', 'baixa'];
 
@@ -115,7 +116,16 @@ async function buscarPorId(req, res, next) {
       [id]
     );
 
-    res.json({ ...solicitacao, processos: processos.rows, historico: historico.rows });
+    const anexos = await pool.query(
+      `SELECT a.id_anexo, a.nome_arquivo, a.tipo_mime, a.tamanho_bytes, a.enviado_em, u.nome AS nome_usuario
+       FROM anexo a
+       LEFT JOIN usuario u ON u.id_usuario = a.id_usuario
+       WHERE a.id_solicitacao = $1
+       ORDER BY a.enviado_em ASC, a.id_anexo ASC`,
+      [id]
+    );
+
+    res.json({ ...solicitacao, processos: processos.rows, historico: historico.rows, anexos: anexos.rows });
   } catch (err) {
     next(err);
   }
@@ -263,4 +273,46 @@ async function cancelar(req, res, next) {
   }
 }
 
-module.exports = { criar, listar, buscarPorId, atualizar, cancelar };
+// DELETE /api/solicitacoes/:id/permanente — exclusão física, só para administrador (RN03).
+// Apaga também etapas, histórico e anexos, sem possibilidade de recuperação.
+async function excluirPermanente(req, res, next) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { rows: existentes } = await client.query(
+      'SELECT id_solicitacao FROM solicitacao WHERE id_solicitacao = $1 FOR UPDATE',
+      [id]
+    );
+    if (existentes.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ erro: 'Solicitação não encontrada.' });
+    }
+
+    const { rows: anexos } = await client.query('SELECT caminho FROM anexo WHERE id_solicitacao = $1', [id]);
+
+    // historico_status não tem chave estrangeira (a entidade é polimórfica) e precisa ser limpo à parte.
+    await client.query(
+      `DELETE FROM historico_status
+       WHERE (entidade = 'solicitacao' AND id_entidade = $1)
+          OR (entidade = 'processo' AND id_entidade IN (
+                SELECT id_processo FROM processo_solicitacao WHERE id_solicitacao = $1))`,
+      [id]
+    );
+    await client.query('DELETE FROM solicitacao WHERE id_solicitacao = $1', [id]);
+
+    await client.query('COMMIT');
+
+    // Só apaga os arquivos depois de confirmar a exclusão no banco.
+    await Promise.all(anexos.map((anexo) => removerArquivo(anexo.caminho)));
+    res.status(204).send();
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { criar, listar, buscarPorId, atualizar, cancelar, excluirPermanente };
