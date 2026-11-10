@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const { ORDER_BY_PRIORIDADE } = require('../utils/priority');
+const { ORDER_BY_LISTA } = require('../utils/priority');
 const { removerArquivo } = require('../middleware/upload');
 const { operadorValido } = require('./processoController');
 
@@ -130,7 +130,7 @@ if (prioridade) { condicoes.push(`s.prioridade = $${i++}::prioridade_solicitacao
        FROM solicitacao s
        JOIN usuario u ON u.id_usuario = s.id_solicitante
        ${where}
-       ${ORDER_BY_PRIORIDADE}`,
+       ${ORDER_BY_LISTA}`,
       valores
     );
 

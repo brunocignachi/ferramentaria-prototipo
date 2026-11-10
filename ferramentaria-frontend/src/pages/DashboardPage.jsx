@@ -76,7 +76,15 @@ export default function DashboardPage() {
     [ativas, busca]
   );
 
-  const concluidas = useMemo(() => ativas.filter((s) => s.status === 'concluida').slice(0, 5), [ativas]);
+  // As 5 concluídas mais recentes, da última concluída para a mais antiga.
+  const concluidas = useMemo(
+    () =>
+      ativas
+        .filter((s) => s.status === 'concluida')
+        .sort((a, b) => new Date(b.data_conclusao) - new Date(a.data_conclusao))
+        .slice(0, 5),
+    [ativas]
+  );
 
   // Situação atual das solicitações abertas dentro do período escolhido.
   const doPeriodo = useMemo(() => {
