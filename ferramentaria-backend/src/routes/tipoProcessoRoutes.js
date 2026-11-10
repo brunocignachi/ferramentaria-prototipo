@@ -9,5 +9,6 @@ router.use(autenticar);
 router.get('/', tipoProcessoController.listar);
 router.post('/', autorizar('administrador'), tipoProcessoController.criar);
 router.patch('/:id', autorizar('administrador'), tipoProcessoController.atualizar);
+router.delete('/:id', autorizar('administrador'), tipoProcessoController.excluir);
 
 module.exports = router;

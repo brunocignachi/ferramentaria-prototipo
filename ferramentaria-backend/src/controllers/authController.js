@@ -10,8 +10,8 @@ async function login(req, res, next) {
     }
 
     const { rows } = await pool.query(
-      'SELECT * FROM usuario WHERE email = $1 AND ativo = TRUE',
-      [email]
+      'SELECT * FROM usuario WHERE LOWER(email) = LOWER($1) AND ativo = TRUE',
+      [String(email).trim()]
     );
     const usuario = rows[0];
 

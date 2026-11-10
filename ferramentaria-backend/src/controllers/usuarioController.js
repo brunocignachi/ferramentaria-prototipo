@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
+const validar = require('../utils/validacao');
 
 const PERFIS_VALIDOS = ['administrador', 'solicitante', 'operador'];
 
@@ -7,11 +8,14 @@ async function criar(req, res, next) {
   try {
     const { nome, email, senha, perfil } = req.body;
 
-    if (!nome || !email || !senha || !perfil) {
-      return res.status(400).json({ erro: 'nome, email, senha e perfil são obrigatórios.' });
-    }
-    if (!PERFIS_VALIDOS.includes(perfil)) {
-      return res.status(400).json({ erro: `perfil deve ser um de: ${PERFIS_VALIDOS.join(', ')}` });
+    const invalido = validar.primeiroErro(
+      validar.texto(nome, { rotulo: 'Nome', max: validar.LIMITES.nomeUsuario, obrigatorio: true }),
+      validar.email(email),
+      validar.senha(senha),
+      !PERFIS_VALIDOS.includes(perfil) && `Perfil deve ser um de: ${PERFIS_VALIDOS.join(', ')}.`
+    );
+    if (invalido) {
+      return res.status(400).json({ erro: invalido });
     }
 
     const senhaHash = await bcrypt.hash(senha, 10);
@@ -19,11 +23,14 @@ async function criar(req, res, next) {
       `INSERT INTO usuario (nome, email, senha_hash, perfil)
        VALUES ($1, $2, $3, $4)
        RETURNING id_usuario, nome, email, perfil, ativo, criado_em`,
-      [nome, email, senhaHash, perfil]
+      [nome.trim(), email.trim().toLowerCase(), senhaHash, perfil]
     );
 
     res.status(201).json(rows[0]);
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ erro: 'Já existe um usuário com este e-mail.' });
+    }
     next(err);
   }
 }
@@ -59,24 +66,28 @@ async function atualizar(req, res, next) {
     const { id } = req.params;
     const { nome, email, perfil, ativo, senha } = req.body;
 
-    if (perfil && !PERFIS_VALIDOS.includes(perfil)) {
-      return res.status(400).json({ erro: `perfil deve ser um de: ${PERFIS_VALIDOS.join(', ')}` });
+    const invalido = validar.primeiroErro(
+      nome !== undefined && validar.texto(nome, { rotulo: 'Nome', max: validar.LIMITES.nomeUsuario, obrigatorio: true }),
+      email !== undefined && validar.email(email),
+      validar.senha(senha, { obrigatoria: false }),
+      perfil !== undefined && !PERFIS_VALIDOS.includes(perfil) && `Perfil deve ser um de: ${PERFIS_VALIDOS.join(', ')}.`,
+      ativo !== undefined && typeof ativo !== 'boolean' && 'ativo deve ser verdadeiro ou falso.'
+    );
+    if (invalido) {
+      return res.status(400).json({ erro: invalido });
     }
     // Evita que o administrador perca o próprio acesso por engano.
     const ehProprioUsuario = Number(id) === req.usuario.id;
     if (ehProprioUsuario && (ativo === false || (perfil && perfil !== req.usuario.perfil))) {
       return res.status(400).json({ erro: 'Você não pode desativar nem mudar o perfil da própria conta.' });
     }
-    if (senha && senha.length < 6) {
-      return res.status(400).json({ erro: 'A senha deve ter pelo menos 6 caracteres.' });
-    }
 
     const campos = [];
     const valores = [];
     let i = 1;
 
-    if (nome !== undefined) { campos.push(`nome = $${i++}`); valores.push(nome); }
-    if (email !== undefined) { campos.push(`email = $${i++}`); valores.push(email); }
+    if (nome !== undefined) { campos.push(`nome = $${i++}`); valores.push(nome.trim()); }
+    if (email !== undefined) { campos.push(`email = $${i++}`); valores.push(email.trim().toLowerCase()); }
     if (perfil !== undefined) { campos.push(`perfil = $${i++}`); valores.push(perfil); }
     if (ativo !== undefined) { campos.push(`ativo = $${i++}`); valores.push(ativo); }
     if (senha) {
@@ -102,6 +113,9 @@ async function atualizar(req, res, next) {
 
     res.json(rows[0]);
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ erro: 'Já existe um usuário com este e-mail.' });
+    }
     next(err);
   }
 }

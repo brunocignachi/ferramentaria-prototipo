@@ -7,6 +7,7 @@ const { ORDER_BY_PRIORIDADE } = require('../utils/priority');
 // depois que todas as anteriores forem concluídas (RF04, E08).
 
 const STATUS_SOLICITACAO_ENCERRADA = ['cancelada', 'concluida'];
+const MAXIMO_ETAPAS = 50;
 
 // Trava a solicitação e depois a etapa, sempre nessa ordem, para não haver
 // deadlock com o cancelamento (solicitacaoController.cancelar) e para impedir
@@ -99,6 +100,10 @@ async function adicionar(req, res, next) {
       'SELECT ordem_execucao, status FROM processo_solicitacao WHERE id_solicitacao = $1',
       [id]
     );
+    if (etapas.length >= MAXIMO_ETAPAS) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: `O roteiro pode ter no máximo ${MAXIMO_ETAPAS} etapas.` });
+    }
 
     let ordem = ordem_execucao;
     if (ordem === undefined) {
@@ -460,4 +465,80 @@ async function concluir(req, res, next) {
   }
 }
 
-module.exports = { adicionar, reordenar, fila, atribuir, iniciar, concluir, operadorValido };
+// DELETE /api/processos/:id — administrador remove uma etapa do roteiro.
+// Só etapas pendentes: as já iniciadas ou concluídas fazem parte do histórico
+// da peça. As etapas seguintes sobem uma posição, e a remoção fica registrada
+// no histórico da solicitação.
+async function remover(req, res, next) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const travados = await travarProcesso(client, id);
+    if (!travados) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ erro: 'Processo não encontrado.' });
+    }
+    const { processo, solicitacao } = travados;
+
+    if (STATUS_SOLICITACAO_ENCERRADA.includes(solicitacao.status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: `Solicitação ${solicitacao.status} não aceita alterações nos processos.` });
+    }
+    if (processo.status !== 'pendente') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ erro: 'Só é possível remover etapas pendentes; as já iniciadas fazem parte do histórico.' });
+    }
+
+    const { rows: tipos } = await client.query(
+      'SELECT nome FROM tipo_processo WHERE id_tipo_processo = $1',
+      [processo.id_tipo_processo]
+    );
+
+    await client.query('DELETE FROM processo_solicitacao WHERE id_processo = $1', [id]);
+    await client.query(
+      `UPDATE processo_solicitacao SET ordem_execucao = ordem_execucao - 1
+       WHERE id_solicitacao = $1 AND ordem_execucao > $2`,
+      [processo.id_solicitacao, processo.ordem_execucao]
+    );
+
+    // RN01: se a etapa removida era a única que faltava, a peça está pronta.
+    const { rows: contagem } = await client.query(
+      `SELECT COUNT(*) FILTER (WHERE status IN ('pendente', 'em_andamento')) AS abertas,
+              COUNT(*) FILTER (WHERE status = 'concluido') AS concluidas
+       FROM processo_solicitacao WHERE id_solicitacao = $1`,
+      [processo.id_solicitacao]
+    );
+    const concluiu = Number(contagem[0].abertas) === 0 && Number(contagem[0].concluidas) > 0;
+    if (concluiu) {
+      await client.query(
+        `UPDATE solicitacao SET status = 'concluida', data_conclusao = NOW() WHERE id_solicitacao = $1`,
+        [processo.id_solicitacao]
+      );
+    }
+
+    const descricao = `Etapa ${processo.ordem_execucao} (${tipos[0]?.nome ?? 'processo'}) removida do roteiro`;
+    await client.query(
+      `INSERT INTO historico_status (entidade, id_entidade, status_anterior, status_novo, id_usuario, observacao)
+       VALUES ('solicitacao', $1, $2, $3, $4, $5)`,
+      [
+        processo.id_solicitacao,
+        solicitacao.status,
+        concluiu ? 'concluida' : solicitacao.status,
+        req.usuario.id,
+        concluiu ? `${descricao}; concluída automaticamente: todas as etapas finalizadas` : descricao,
+      ]
+    );
+
+    await client.query('COMMIT');
+    res.json({ removido: Number(id), solicitacao_concluida: concluiu });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { adicionar, reordenar, fila, atribuir, iniciar, concluir, remover, operadorValido };

@@ -14,4 +14,6 @@ router.patch('/:id/iniciar', autorizar('operador', 'administrador'), processoCon
 
 router.patch('/:id/concluir', autorizar('operador', 'administrador'), processoController.concluir);
 
+router.delete('/:id', autorizar('administrador'), processoController.remover);
+
 module.exports = router;

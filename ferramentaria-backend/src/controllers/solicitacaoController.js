@@ -3,7 +3,25 @@ const { ORDER_BY_PRIORIDADE } = require('../utils/priority');
 const { removerArquivo } = require('../middleware/upload');
 const { operadorValido } = require('./processoController');
 
+const validar = require('../utils/validacao');
+
 const PRIORIDADES_VALIDAS = ['urgente', 'alta', 'normal', 'baixa'];
+const MAXIMO_ETAPAS = 50;
+
+// Valida os campos informados. Na criação, os obrigatórios precisam vir; na
+// edição, só o que foi enviado é conferido.
+function validarCampos(campos, criando) {
+  const { LIMITES } = validar;
+  const informado = (campo) => criando || campos[campo] !== undefined;
+  return validar.primeiroErro(
+    informado('numero_desenho') &&
+      validar.texto(campos.numero_desenho, { rotulo: 'Número do desenho', max: LIMITES.numeroDesenho, obrigatorio: true }),
+    informado('quantidade') && validar.quantidade(campos.quantidade),
+    informado('data_prazo') && validar.data(campos.data_prazo, 'Prazo'),
+    validar.texto(campos.descricao, { rotulo: 'Descrição', max: LIMITES.textoLongo }),
+    validar.texto(campos.observacoes, { rotulo: 'Observações', max: LIMITES.textoLongo })
+  );
+}
 
 // POST /api/solicitacoes — solicitante ou administrador (RF01). Pode receber o
 // roteiro em "processos", na ordem de execução: a solicitação e as etapas são
@@ -13,14 +31,18 @@ async function criar(req, res, next) {
   try {
     const { numero_desenho, descricao, quantidade, prioridade, data_prazo, observacoes, processos = [] } = req.body;
 
-    if (!numero_desenho || !quantidade || !data_prazo) {
-      return res.status(400).json({ erro: 'numero_desenho, quantidade e data_prazo são obrigatórios.' });
+    const invalido = validarCampos({ numero_desenho, descricao, quantidade, data_prazo, observacoes }, true);
+    if (invalido) {
+      return res.status(400).json({ erro: invalido });
     }
     if (prioridade && !PRIORIDADES_VALIDAS.includes(prioridade)) {
       return res.status(400).json({ erro: `prioridade deve ser um de: ${PRIORIDADES_VALIDAS.join(', ')}` });
     }
     if (!Array.isArray(processos) || processos.some((etapa) => !etapa?.id_tipo_processo)) {
       return res.status(400).json({ erro: 'processos deve ser uma lista de etapas com id_tipo_processo.' });
+    }
+    if (processos.length > MAXIMO_ETAPAS) {
+      return res.status(400).json({ erro: `O roteiro pode ter no máximo ${MAXIMO_ETAPAS} etapas.` });
     }
 
     // Solicitante é sempre o usuário autenticado, a menos que um administrador
@@ -51,7 +73,15 @@ async function criar(req, res, next) {
          (numero_desenho, descricao, quantidade, prioridade, data_prazo, observacoes, id_solicitante)
        VALUES ($1, $2, $3, $4::prioridade_solicitacao, $5, $6, $7)
        RETURNING *`,
-      [numero_desenho, descricao || null, quantidade, prioridade || 'normal', data_prazo, observacoes || null, idSolicitante]
+      [
+        numero_desenho.trim(),
+        descricao?.trim() || null,
+        Number(quantidade),
+        prioridade || 'normal',
+        data_prazo,
+        observacoes?.trim() || null,
+        idSolicitante,
+      ]
     );
 
     const etapasCriadas = [];
@@ -203,20 +233,21 @@ async function atualizar(req, res, next) {
       await client.query('ROLLBACK');
       return res.status(400).json({ erro: `prioridade deve ser um de: ${PRIORIDADES_VALIDAS.join(', ')}` });
     }
-    if (numero_desenho !== undefined && !numero_desenho) {
+    const invalido = validarCampos({ numero_desenho, descricao, quantidade, data_prazo, observacoes }, false);
+    if (invalido) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ erro: 'numero_desenho não pode ficar vazio.' });
+      return res.status(400).json({ erro: invalido });
     }
 
     const campos = [];
     const valores = [];
     let i = 1;
-    if (numero_desenho !== undefined) { campos.push(`numero_desenho = $${i++}`); valores.push(numero_desenho); }
-    if (descricao !== undefined) { campos.push(`descricao = $${i++}`); valores.push(descricao); }
-    if (quantidade !== undefined) { campos.push(`quantidade = $${i++}`); valores.push(quantidade); }
+    if (numero_desenho !== undefined) { campos.push(`numero_desenho = $${i++}`); valores.push(numero_desenho.trim()); }
+    if (descricao !== undefined) { campos.push(`descricao = $${i++}`); valores.push(descricao?.trim() || null); }
+    if (quantidade !== undefined) { campos.push(`quantidade = $${i++}`); valores.push(Number(quantidade)); }
     if (prioridade !== undefined) { campos.push(`prioridade = $${i++}::prioridade_solicitacao`); valores.push(prioridade); }
     if (data_prazo !== undefined) { campos.push(`data_prazo = $${i++}`); valores.push(data_prazo); }
-    if (observacoes !== undefined) { campos.push(`observacoes = $${i++}`); valores.push(observacoes); }
+    if (observacoes !== undefined) { campos.push(`observacoes = $${i++}`); valores.push(observacoes?.trim() || null); }
 
     if (campos.length === 0) {
       await client.query('ROLLBACK');
