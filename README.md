@@ -24,8 +24,9 @@ npm run dev
 ```
 
 Na primeira vez, crie o banco com `npm run db:migrate` e `npm run db:seed` na pasta
-do back-end. O seed cria o administrador `admin@ferramentaria.local`, que serve apenas para desenvolvimento e deve ser trocada em qualquer
-outro ambiente.
+do back-end. O seed cria o administrador `admin@ferramentaria.local` com a senha inicial
+definida em `ferramentaria-backend/db/seed.js`. Troque essa senha no primeiro acesso,
+em Configurações, antes de usar o sistema em qualquer outro ambiente.
 
 ## Abrir pelo celular
 
@@ -39,3 +40,17 @@ O celular precisa estar na mesma rede Wi-Fi do computador.
 Na primeira vez, o Windows pode perguntar se o Node.js pode usar a rede: permita
 em redes privadas. O site procura a API no mesmo computador que o serviu, então
 não é preciso mudar o `.env`.
+
+## Publicar no Render
+
+O arquivo `render.yaml` descreve um único serviço: o servidor da API também entrega
+o site compilado, então tudo fica no mesmo endereço.
+
+1. No Render, escolha **New → Blueprint** e selecione este repositório.
+2. Preencha `DATABASE_URL` com a connection string do banco (ex.: Neon).
+   O `JWT_SECRET` é gerado pelo próprio Render.
+3. Aguarde o deploy e abra o endereço `https://<nome-do-serviço>.onrender.com`.
+
+No plano gratuito, o serviço dorme após 15 minutos sem uso (o primeiro acesso depois
+disso leva cerca de um minuto), e os arquivos gravados no servidor, como anexos e
+backups, são apagados a cada reinício ou novo deploy. Os dados do banco não são afetados.

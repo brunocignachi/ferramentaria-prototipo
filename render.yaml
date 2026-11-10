@@ -1,0 +1,20 @@
+# Blueprint do Render: um serviço que roda a API e entrega o site compilado.
+services:
+  - type: web
+    name: ferramentaria
+    runtime: node
+    plan: free
+    buildCommand: cd ferramentaria-frontend && npm ci && npm run build && cd ../ferramentaria-backend && npm ci --omit=dev
+    startCommand: cd ferramentaria-backend && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_URL
+        value: /api
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
