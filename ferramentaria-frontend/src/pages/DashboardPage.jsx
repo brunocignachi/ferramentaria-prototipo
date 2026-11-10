@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import ProgressRing from '../components/ProgressRing';
 import NovaSolicitacaoForm from '../components/NovaSolicitacaoForm';
+import IndicadoresAdmin from '../components/IndicadoresAdmin';
 import {
   PRIORIDADE_COR,
   PRIORIDADE_LABEL,
@@ -127,6 +128,8 @@ export default function DashboardPage() {
         </header>
 
         {erro && <p className="dashboard__error">{erro}</p>}
+
+        {usuario?.perfil === 'administrador' && <IndicadoresAdmin />}
 
         <div className="dashboard__grid">
           <section className="card card--tasks">

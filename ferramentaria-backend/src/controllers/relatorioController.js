@@ -35,7 +35,9 @@ async function solicitacoes(req, res, next) {
     if (data_inicio) { condicoes.push(`${diaLocal('s.data_abertura')} >= $${i++}::date`); valores.push(data_inicio); }
     if (data_fim) { condicoes.push(`${diaLocal('s.data_abertura')} <= $${i++}::date`); valores.push(data_fim); }
     if (status) { condicoes.push(`s.status = $${i++}::status_solicitacao`); valores.push(status); }
+    let parametroOperador = null;
     if (id_operador) {
+      parametroOperador = `${i}`;
       condicoes.push(`EXISTS (
         SELECT 1 FROM processo_solicitacao filtro
         WHERE filtro.id_solicitacao = s.id_solicitacao AND filtro.id_operador = $${i++}
@@ -61,6 +63,32 @@ async function solicitacoes(req, res, next) {
       valores
     );
 
+    // Tempo de cada processo: do "Iniciar" ao "Concluir" das etapas concluídas
+    // das solicitações do relatório (com filtro de operador, só as etapas dele).
+    // É tempo corrido, então inclui pausas, noites e fins de semana.
+    const condicoesEtapa = [
+      `p.status = 'concluido'`,
+      'p.data_inicio IS NOT NULL',
+      'p.data_conclusao IS NOT NULL',
+      ...condicoes,
+      ...(parametroOperador ? [`p.id_operador = ${parametroOperador}`] : []),
+    ];
+    const minutos = 'EXTRACT(EPOCH FROM (p.data_conclusao - p.data_inicio))::numeric / 60';
+    const { rows: tempos } = await pool.query(
+      `SELECT tp.id_tipo_processo, tp.nome AS nome_tipo_processo,
+              COUNT(*)::int AS etapas,
+              ROUND(AVG(${minutos}))::int AS media_minutos,
+              ROUND(MIN(${minutos}))::int AS menor_minutos,
+              ROUND(MAX(${minutos}))::int AS maior_minutos
+       FROM processo_solicitacao p
+       JOIN solicitacao s ON s.id_solicitacao = p.id_solicitacao
+       JOIN tipo_processo tp ON tp.id_tipo_processo = p.id_tipo_processo
+       WHERE ${condicoesEtapa.join(' AND ')}
+       GROUP BY tp.id_tipo_processo, tp.nome
+       ORDER BY media_minutos DESC, tp.nome ASC`,
+      valores
+    );
+
     const concluidas = rows.filter((s) => s.status === 'concluida').length;
     const noPrazo = rows.filter((s) => s.concluida_no_prazo).length;
 
@@ -76,10 +104,39 @@ async function solicitacoes(req, res, next) {
         otd_percentual: concluidas ? Math.round((noPrazo / concluidas) * 1000) / 10 : null,
       },
       solicitacoes: rows,
+      tempos_por_processo: tempos,
     });
   } catch (err) {
     next(err);
   }
 }
 
-module.exports = { solicitacoes };
+// GET /api/relatorios/indicadores — números do dashboard do administrador:
+// situação de agora e desempenho das peças concluídas nos últimos 30 dias.
+async function indicadores(req, res, next) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE s.status = 'aberta')::int AS a_fazer,
+         COUNT(*) FILTER (WHERE s.status = 'em_andamento')::int AS em_progresso,
+         COUNT(*) FILTER (WHERE s.status IN ('aberta', 'em_andamento') AND s.data_prazo < ${HOJE_LOCAL})::int AS em_atraso,
+         COUNT(*) FILTER (WHERE s.status IN ('aberta', 'em_andamento') AND s.data_prazo >= ${HOJE_LOCAL}
+                            AND s.data_prazo < ${HOJE_LOCAL} + 7)::int AS vencem_em_7_dias,
+         COUNT(*) FILTER (WHERE s.status = 'concluida' AND s.data_conclusao >= NOW() - INTERVAL '30 days')::int AS concluidas_30_dias,
+         COUNT(*) FILTER (WHERE s.status = 'concluida' AND s.data_conclusao >= NOW() - INTERVAL '30 days'
+                            AND ${diaLocal('s.data_conclusao')} <= s.data_prazo)::int AS no_prazo_30_dias,
+         (SELECT COUNT(*) FROM processo_solicitacao p JOIN solicitacao sa ON sa.id_solicitacao = p.id_solicitacao
+          WHERE p.status = 'pendente' AND p.id_operador IS NULL AND sa.status IN ('aberta', 'em_andamento'))::int AS etapas_sem_operador
+       FROM solicitacao s`
+    );
+    const r = rows[0];
+    res.json({
+      ...r,
+      otd_30_dias: r.concluidas_30_dias ? Math.round((r.no_prazo_30_dias / r.concluidas_30_dias) * 1000) / 10 : null,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { solicitacoes, indicadores };

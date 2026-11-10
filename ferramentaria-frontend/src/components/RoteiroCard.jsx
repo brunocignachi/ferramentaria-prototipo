@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { apiRequest } from '../api/client';
 import { useConfirmar } from '../context/ConfirmacaoContext';
-import { STATUS_ETAPA_LABEL, formatarDataHora, podeAtuarNaEtapa } from '../utils/solicitacao';
+import { useConcluirEtapa } from '../hooks/useConcluirEtapa';
+import {
+  STATUS_ETAPA_LABEL,
+  duracaoDaEtapa,
+  formatarDataHora,
+  formatarDuracao,
+  podeAtuarNaEtapa,
+} from '../utils/solicitacao';
 
 // Roteiro de fabricação da peça (RF04, RF05). A ordem é própria de cada
 // solicitação, e o mesmo processo pode se repetir (ex.: torno, fresa, torno).
@@ -11,6 +18,7 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
   const confirmar = useConfirmar();
+  const pedirConclusao = useConcluirEtapa();
 
   const { processos: etapas } = solicitacao;
   const ativa = solicitacao.status === 'aberta' || solicitacao.status === 'em_andamento';
@@ -82,8 +90,14 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
     executar(() => apiRequest(`/processos/${etapa.id_processo}`, { method: 'DELETE' }));
   }
 
-  function alterarStatus(idProcesso, acao) {
-    executar(() => apiRequest(`/processos/${idProcesso}/${acao}`, { method: 'PATCH' }));
+  function iniciarEtapa(idProcesso) {
+    executar(() => apiRequest(`/processos/${idProcesso}/iniciar`, { method: 'PATCH' }));
+  }
+
+  async function concluirEtapa(etapa) {
+    const corpo = await pedirConclusao(`etapa ${etapa.ordem_execucao} (${etapa.nome_tipo_processo})`);
+    if (!corpo) return;
+    executar(() => apiRequest(`/processos/${etapa.id_processo}/concluir`, { method: 'PATCH', body: corpo }));
   }
 
   return (
@@ -118,6 +132,12 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
                   </small>
                   {etapa.data_inicio && <small>Início: {formatarDataHora(etapa.data_inicio)}</small>}
                   {etapa.data_conclusao && <small>Conclusão: {formatarDataHora(etapa.data_conclusao)}</small>}
+                  {duracaoDaEtapa(etapa) !== null && (
+                    <small className="roteiro__duracao">Tempo da etapa: {formatarDuracao(duracaoDaEtapa(etapa))}</small>
+                  )}
+                  {etapa.observacao_conclusao && (
+                    <small className="roteiro__observacao">Observação: {etapa.observacao_conclusao}</small>
+                  )}
                 </div>
 
                 <div className="roteiro__controles">
@@ -176,7 +196,7 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
                       type="button"
                       className="btn btn--primario"
                       disabled={ocupado}
-                      onClick={() => alterarStatus(etapa.id_processo, 'iniciar')}
+                      onClick={() => iniciarEtapa(etapa.id_processo)}
                     >
                       Iniciar
                     </button>
@@ -186,7 +206,7 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
                       type="button"
                       className="btn btn--primario"
                       disabled={ocupado}
-                      onClick={() => alterarStatus(etapa.id_processo, 'concluir')}
+                      onClick={() => concluirEtapa(etapa)}
                     >
                       Concluir
                     </button>

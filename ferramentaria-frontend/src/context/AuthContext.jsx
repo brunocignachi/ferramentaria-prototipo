@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useState } from 'react';
-import { apiRequest, STORAGE_KEY } from '../api/client';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { apiRequest, EVENTO_SESSAO_ENCERRADA, STORAGE_KEY } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -34,6 +34,13 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
     setAuth(null);
+  }, []);
+
+  // A API avisou que a sessão não vale mais (ex.: usuário desativado pelo administrador).
+  useEffect(() => {
+    const encerrar = () => setAuth(null);
+    window.addEventListener(EVENTO_SESSAO_ENCERRADA, encerrar);
+    return () => window.removeEventListener(EVENTO_SESSAO_ENCERRADA, encerrar);
   }, []);
 
   const value = {

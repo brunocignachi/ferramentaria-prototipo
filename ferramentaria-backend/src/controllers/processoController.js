@@ -1,5 +1,7 @@
 const pool = require('../config/db');
 const { ORDER_BY_PRIORIDADE } = require('../utils/priority');
+const { nomeDaPeca, notificar } = require('../utils/notificacao');
+const validar = require('../utils/validacao');
 
 // O roteiro de cada solicitação é próprio: as etapas são linhas de
 // processo_solicitacao ordenadas por ordem_execucao, e o mesmo tipo de processo
@@ -48,7 +50,31 @@ async function travarSolicitacaoParaRoteiro(client, idSolicitacao, usuario) {
   if (STATUS_SOLICITACAO_ENCERRADA.includes(rows[0].status)) {
     return { status: 400, erro: `Solicitação ${rows[0].status} não aceita alterações nos processos.` };
   }
-  return {};
+  return { solicitacao: rows[0] };
+}
+
+// Avisa o operador que passou a ser responsável por uma etapa.
+async function avisarOperadorAtribuido(client, { idOperador, idAutor, solicitacao, ordem, idTipo }) {
+  if (!idOperador) return;
+  const { rows } = await client.query('SELECT nome FROM tipo_processo WHERE id_tipo_processo = $1', [idTipo]);
+  await notificar(client, {
+    destinatarios: [idOperador],
+    idAutor,
+    idSolicitacao: solicitacao.id_solicitacao,
+    tipo: 'etapa_atribuida',
+    mensagem: `Você foi incluído na solicitação "${nomeDaPeca(solicitacao)}": etapa ${ordem} (${rows[0]?.nome ?? 'processo'}).`,
+  });
+}
+
+// RN01: avisa quem abriu a solicitação que a peça ficou pronta.
+async function avisarConclusao(client, { solicitacao, idAutor }) {
+  await notificar(client, {
+    destinatarios: [solicitacao.id_solicitante],
+    idAutor,
+    idSolicitacao: solicitacao.id_solicitacao,
+    tipo: 'concluida',
+    mensagem: `A solicitação "${nomeDaPeca(solicitacao)}" foi concluída.`,
+  });
 }
 
 // Só um usuário ativo com perfil de operador pode ser responsável por uma etapa (RN04).
@@ -129,6 +155,14 @@ async function adicionar(req, res, next) {
        RETURNING *`,
       [ordem, id, id_tipo_processo, id_operador || null, observacoes || null]
     );
+
+    await avisarOperadorAtribuido(client, {
+      idOperador: rows[0].id_operador,
+      idAutor: req.usuario.id,
+      solicitacao: bloqueio.solicitacao,
+      ordem: rows[0].ordem_execucao,
+      idTipo: rows[0].id_tipo_processo,
+    });
 
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
@@ -239,7 +273,7 @@ async function fila(req, res, next) {
 
     const { rows } = await pool.query(
       `SELECT p.*, tp.nome AS nome_tipo_processo,
-              s.numero_desenho, s.prioridade, s.data_prazo, s.id_solicitacao,
+              s.numero_desenho, s.descricao, s.prioridade, s.data_prazo, s.id_solicitacao,
               op.nome AS nome_operador
        FROM processo_solicitacao p
        JOIN tipo_processo tp ON tp.id_tipo_processo = p.id_tipo_processo
@@ -294,6 +328,17 @@ async function atribuir(req, res, next) {
       `UPDATE processo_solicitacao SET id_operador = $1 WHERE id_processo = $2 RETURNING *`,
       [id_operador, id]
     );
+
+    // Só avisa quando o responsável muda de fato.
+    if (processo.id_operador !== Number(id_operador)) {
+      await avisarOperadorAtribuido(client, {
+        idOperador: Number(id_operador),
+        idAutor: req.usuario.id,
+        solicitacao,
+        ordem: processo.ordem_execucao,
+        idTipo: processo.id_tipo_processo,
+      });
+    }
 
     await client.query('COMMIT');
     res.json(rows[0]);
@@ -391,8 +436,15 @@ async function iniciar(req, res, next) {
   }
 }
 
-// PATCH /api/processos/:id/concluir — operador conclui a etapa (E08, E09, RN01)
+// PATCH /api/processos/:id/concluir — operador conclui a etapa (E08, E09, RN01).
+// Corpo opcional: { "observacao": "medida ajustada" }, que fica no histórico da peça.
 async function concluir(req, res, next) {
+  const observacao = req.body?.observacao;
+  const invalida = validar.texto(observacao, { rotulo: 'Observação', max: validar.LIMITES.textoLongo });
+  if (invalida) {
+    return res.status(400).json({ erro: invalida });
+  }
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -427,9 +479,9 @@ async function concluir(req, res, next) {
     );
 
     await client.query(
-      `INSERT INTO historico_status (entidade, id_entidade, status_anterior, status_novo, id_usuario)
-       VALUES ('processo', $1, 'em_andamento', 'concluido', $2)`,
-      [id, req.usuario.id]
+      `INSERT INTO historico_status (entidade, id_entidade, status_anterior, status_novo, id_usuario, observacao)
+       VALUES ('processo', $1, 'em_andamento', 'concluido', $2, $3)`,
+      [id, req.usuario.id, observacao?.trim() || null]
     );
 
     // RN01/E09: se não sobrar nenhuma etapa pendente ou em andamento, a
@@ -453,6 +505,7 @@ async function concluir(req, res, next) {
         [processo.id_solicitacao, solicitacao.status, req.usuario.id]
       );
       solicitacaoConcluida = true;
+      await avisarConclusao(client, { solicitacao, idAutor: req.usuario.id });
     }
 
     await client.query('COMMIT');
@@ -516,6 +569,7 @@ async function remover(req, res, next) {
         `UPDATE solicitacao SET status = 'concluida', data_conclusao = NOW() WHERE id_solicitacao = $1`,
         [processo.id_solicitacao]
       );
+      await avisarConclusao(client, { solicitacao, idAutor: req.usuario.id });
     }
 
     const descricao = `Etapa ${processo.ordem_execucao} (${tipos[0]?.nome ?? 'processo'}) removida do roteiro`;

@@ -4,6 +4,7 @@ const { removerArquivo } = require('../middleware/upload');
 const { operadorValido } = require('./processoController');
 
 const validar = require('../utils/validacao');
+const { nomeDaPeca, notificar, operadoresDaSolicitacao } = require('../utils/notificacao');
 
 const PRIORIDADES_VALIDAS = ['urgente', 'alta', 'normal', 'baixa'];
 const MAXIMO_ETAPAS = 50;
@@ -95,6 +96,15 @@ async function criar(req, res, next) {
       etapasCriadas.push(criada[0]);
     }
 
+    // Avisa os operadores que já têm etapa na nova solicitação.
+    await notificar(client, {
+      destinatarios: etapasCriadas.map((etapa) => etapa.id_operador),
+      idAutor: req.usuario.id,
+      idSolicitacao: rows[0].id_solicitacao,
+      tipo: 'nova_solicitacao',
+      mensagem: `Nova solicitação aberta: "${nomeDaPeca(rows[0])}", com etapa atribuída a você.`,
+    });
+
     await client.query('COMMIT');
     res.status(201).json({ ...rows[0], processos: etapasCriadas });
   } catch (err) {
@@ -114,7 +124,7 @@ async function listar(req, res, next) {
     let i = 1;
 
     if (status) { condicoes.push(`s.status = $${i++}::status_solicitacao`); valores.push(status); }
-if (prioridade) { condicoes.push(`s.prioridade = $${i++}::prioridade_solicitacao`); valores.push(prioridade); }
+    if (prioridade) { condicoes.push(`s.prioridade = $${i++}::prioridade_solicitacao`); valores.push(prioridade); }
     if (id_solicitante) { condicoes.push(`s.id_solicitante = $${i++}`); valores.push(id_solicitante); }
 
     // Um solicitante só enxerga as próprias solicitações; admin e operador veem todas.
@@ -125,8 +135,15 @@ if (prioridade) { condicoes.push(`s.prioridade = $${i++}::prioridade_solicitacao
 
     const where = condicoes.length ? `WHERE ${condicoes.join(' AND ')}` : '';
 
+    // "operadores" alimenta o filtro por operador da tela de solicitações.
     const { rows } = await pool.query(
-      `SELECT s.*, u.nome AS nome_solicitante
+      `SELECT s.*, u.nome AS nome_solicitante,
+              COALESCE((
+                SELECT json_agg(json_build_object('id_usuario', o.id_usuario, 'nome', o.nome) ORDER BY o.nome)
+                FROM usuario o
+                WHERE o.id_usuario IN (SELECT p.id_operador FROM processo_solicitacao p
+                                       WHERE p.id_solicitacao = s.id_solicitacao)
+              ), '[]'::json) AS operadores
        FROM solicitacao s
        JOIN usuario u ON u.id_usuario = s.id_solicitante
        ${where}
@@ -162,7 +179,10 @@ async function buscarPorId(req, res, next) {
     }
 
     const processos = await pool.query(
-      `SELECT p.*, tp.nome AS nome_tipo_processo, op.nome AS nome_operador
+      `SELECT p.*, tp.nome AS nome_tipo_processo, op.nome AS nome_operador,
+              (SELECT h.observacao FROM historico_status h
+               WHERE h.entidade = 'processo' AND h.id_entidade = p.id_processo AND h.status_novo = 'concluido'
+               ORDER BY h.id_historico DESC LIMIT 1) AS observacao_conclusao
        FROM processo_solicitacao p
        JOIN tipo_processo tp ON tp.id_tipo_processo = p.id_tipo_processo
        LEFT JOIN usuario op ON op.id_usuario = p.id_operador
@@ -332,6 +352,15 @@ async function cancelar(req, res, next) {
        WHERE id_solicitacao = $1 AND status IN ('pendente', 'em_andamento')`,
       [id]
     );
+
+    // E03: avisa os operadores do roteiro e o solicitante (quando quem cancelou foi outra pessoa).
+    await notificar(client, {
+      destinatarios: [...(await operadoresDaSolicitacao(client, id)), atual.id_solicitante],
+      idAutor: req.usuario.id,
+      idSolicitacao: Number(id),
+      tipo: 'cancelada',
+      mensagem: `A solicitação "${nomeDaPeca(atual)}" foi cancelada.`,
+    });
 
     await client.query('COMMIT');
     res.json(rows[0]);

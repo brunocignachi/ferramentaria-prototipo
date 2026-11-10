@@ -1,15 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotificacoes } from '../context/NotificacoesContext';
 import Icone from './Icone';
 import './Sidebar.css';
 
 // Itens do protótipo que ainda não têm tela: ficam desativados para não
 // simular uma funcionalidade que não existe.
-const ITENS_FUTUROS = [
-  { key: 'configuracoes', label: 'Configurações' },
-  { key: 'ajuda', label: 'Ajuda' },
-];
+const ITENS_FUTUROS = [];
+
+// Número de não lidas ao lado do item; acima de 99 mostra "99+".
+function Contador({ valor, className = '' }) {
+  if (!valor) return null;
+  return (
+    <span className={`contador ${className}`.trim()} aria-label={`${valor} não lidas`}>
+      {valor > 99 ? '99+' : valor}
+    </span>
+  );
+}
 
 // Itens visíveis para o perfil, com a marcação do item da página atual.
 function itensDoMenu(perfil, pathname, search) {
@@ -34,6 +42,11 @@ function itensDoMenu(perfil, pathname, search) {
       { chave: 'tipos', para: '/tipos-processo', rotulo: 'Tipos de processo', ativo: pathname === '/tipos-processo' }
     );
   }
+  itens.push(
+    { chave: 'sino', para: '/notificacoes', rotulo: 'Notificações', ativo: pathname === '/notificacoes', contador: true },
+    { chave: 'configuracoes', para: '/configuracoes', rotulo: 'Configurações', ativo: pathname === '/configuracoes' },
+    { chave: 'ajuda', para: '/ajuda', rotulo: 'Ajuda', ativo: pathname === '/ajuda' }
+  );
   return itens;
 }
 
@@ -45,7 +58,7 @@ const ATALHOS_POR_PERFIL = {
   solicitante: ['inicio', 'solicitacoes', 'historico'],
 };
 
-function Gaveta({ itens, usuario, onFechar, onSair }) {
+function Gaveta({ itens, usuario, naoLidas, onFechar, onSair }) {
   const janela = useRef(null);
 
   useEffect(() => {
@@ -86,6 +99,7 @@ function Gaveta({ itens, usuario, onFechar, onSair }) {
             >
               <Icone nome={item.chave} />
               {item.rotulo}
+              {item.contador && <Contador valor={naoLidas} />}
             </Link>
           ))}
         </nav>
@@ -107,6 +121,7 @@ export default function Sidebar() {
   const { usuario, logout } = useAuth();
   const { pathname, search } = useLocation();
   const [gavetaAberta, setGavetaAberta] = useState(false);
+  const { naoLidas } = useNotificacoes();
 
   const itens = itensDoMenu(usuario?.perfil, pathname, search);
   const atalhos = (ATALHOS_POR_PERFIL[usuario?.perfil] ?? ['inicio', 'solicitacoes'])
@@ -137,6 +152,7 @@ export default function Sidebar() {
               aria-current={item.ativo ? 'page' : undefined}
             >
               {item.rotulo}
+              {item.contador && <Contador valor={naoLidas} />}
             </Link>
           ))}
 
@@ -155,14 +171,24 @@ export default function Sidebar() {
       {/* Celular: barra superior compacta e abas na parte de baixo */}
       <header className="barra-movel">
         <span className="barra-movel__marca">Ferramentaria</span>
-        <button
-          type="button"
-          className="barra-movel__avatar"
-          aria-label={`Menu de ${usuario?.nome ?? 'usuário'}`}
-          onClick={() => setGavetaAberta(true)}
-        >
-          {usuario?.nome?.charAt(0).toUpperCase() ?? '?'}
-        </button>
+        <div className="barra-movel__acoes">
+          <Link
+            to="/notificacoes"
+            className="barra-movel__sino"
+            aria-label={naoLidas ? `Notificações, ${naoLidas} não lidas` : 'Notificações'}
+          >
+            <Icone nome="sino" />
+            <Contador valor={naoLidas} className="contador--sobre" />
+          </Link>
+          <button
+            type="button"
+            className="barra-movel__avatar"
+            aria-label={`Menu de ${usuario?.nome ?? 'usuário'}`}
+            onClick={() => setGavetaAberta(true)}
+          >
+            {usuario?.nome?.charAt(0).toUpperCase() ?? '?'}
+          </button>
+        </div>
       </header>
 
       <nav className="abas-movel" aria-label="Navegação principal">
@@ -189,7 +215,13 @@ export default function Sidebar() {
       </nav>
 
       {gavetaAberta && (
-        <Gaveta itens={itens} usuario={usuario} onFechar={() => setGavetaAberta(false)} onSair={logout} />
+        <Gaveta
+          itens={itens}
+          usuario={usuario}
+          naoLidas={naoLidas}
+          onFechar={() => setGavetaAberta(false)}
+          onSair={logout}
+        />
       )}
     </>
   );

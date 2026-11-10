@@ -7,6 +7,7 @@ const solicitacaoRoutes = require('./solicitacaoRoutes');
 const processoRoutes = require('./processoRoutes');
 const anexoRoutes = require('./anexoRoutes');
 const relatorioRoutes = require('./relatorioRoutes');
+const notificacaoRoutes = require('./notificacaoRoutes');
 
 const router = express.Router();
 
@@ -17,5 +18,6 @@ router.use('/solicitacoes', solicitacaoRoutes);
 router.use('/processos', processoRoutes);
 router.use('/anexos', anexoRoutes);
 router.use('/relatorios', relatorioRoutes);
+router.use('/notificacoes', notificacaoRoutes);
 
 module.exports = router;

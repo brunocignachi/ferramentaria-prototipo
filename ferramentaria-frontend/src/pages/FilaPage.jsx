@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { apiRequest } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
+import { useConcluirEtapa } from '../hooks/useConcluirEtapa';
 import {
   PRIORIDADE_COR,
   PRIORIDADE_LABEL,
   STATUS_ETAPA_LABEL,
   formatarPrazo,
   podeAtuarNaEtapa,
+  tituloDaPeca,
 } from '../utils/solicitacao';
 import './DashboardPage.css';
 import '../styles/Solicitacoes.css';
@@ -24,6 +26,7 @@ export default function FilaPage() {
   const [carregando, setCarregando] = useState(true);
   const [processando, setProcessando] = useState(null);
   const [erro, setErro] = useState('');
+  const pedirConclusao = useConcluirEtapa();
 
   const carregarFila = useCallback(async () => {
     setCarregando(true);
@@ -53,16 +56,21 @@ export default function FilaPage() {
     [etapas, apenasMinhas, usuario]
   );
 
-  async function atualizarEtapa(idProcesso, acao) {
+  async function atualizarEtapa(idProcesso, acao, corpo) {
     setProcessando(idProcesso);
     setErro('');
     try {
-      await apiRequest(`/processos/${idProcesso}/${acao}`, { method: 'PATCH' });
+      await apiRequest(`/processos/${idProcesso}/${acao}`, { method: 'PATCH', ...(corpo ? { body: corpo } : {}) });
     } catch (err) {
       setErro(err.message);
     }
     await carregarFila();
     setProcessando(null);
+  }
+
+  async function concluirEtapa(etapa) {
+    const corpo = await pedirConclusao(`etapa ${etapa.ordem_execucao} (${etapa.nome_tipo_processo}) de "${tituloDaPeca(etapa)}"`);
+    if (corpo) await atualizarEtapa(etapa.id_processo, 'concluir', corpo);
   }
 
   return (
@@ -110,13 +118,14 @@ export default function FilaPage() {
                     <div className="task-list__body">
                       <strong>
                         <Link className="task-link" to={`/solicitacoes/${etapa.id_solicitacao}`}>
-                          {etapa.numero_desenho}
+                          {tituloDaPeca(etapa)}
                         </Link>
                       </strong>
                       <span>
                         Etapa {etapa.ordem_execucao}: {etapa.nome_tipo_processo} · {STATUS_ETAPA_LABEL[etapa.status]}
                       </span>
                       <small>
+                        {etapa.descricao?.trim() ? `Desenho: ${etapa.numero_desenho} · ` : ''}
                         Prioridade: {PRIORIDADE_LABEL[etapa.prioridade]} · Prazo: {formatarPrazo(etapa.data_prazo)} ·
                         Operador: {etapa.nome_operador ?? 'não atribuído'}
                       </small>
@@ -138,7 +147,7 @@ export default function FilaPage() {
                       type="button"
                       className="btn btn--primario"
                       disabled={processando === etapa.id_processo}
-                      onClick={() => atualizarEtapa(etapa.id_processo, 'concluir')}
+                      onClick={() => concluirEtapa(etapa)}
                     >
                       Concluir
                     </button>

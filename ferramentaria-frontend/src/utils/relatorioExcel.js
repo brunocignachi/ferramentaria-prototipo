@@ -1,4 +1,4 @@
-import { PRIORIDADE_LABEL, STATUS_SOLICITACAO_LABEL, situacaoDoPrazo } from './solicitacao';
+import { PRIORIDADE_LABEL, STATUS_SOLICITACAO_LABEL, formatarDuracao, situacaoDoPrazo } from './solicitacao';
 
 const VERDE_ESCURO = 'FF0F3D2E';
 const CINZA_BORDA = 'FFD1D5DB';
@@ -92,6 +92,34 @@ function montarTabela(planilha, solicitacoes) {
   planilha.autoFilter = { from: 'A1', to: { row: 1, column: planilha.columns.length } };
 }
 
+// Minutos como número, para dar para calcular no Excel, e o texto legível ao lado.
+function montarTempos(planilha, tempos) {
+  planilha.columns = [
+    { header: 'Processo', key: 'processo', width: 24 },
+    { header: 'Etapas concluídas', key: 'etapas', width: 17 },
+    { header: 'Média (min)', key: 'media', width: 12 },
+    { header: 'Menor (min)', key: 'menor', width: 12 },
+    { header: 'Maior (min)', key: 'maior', width: 12 },
+    { header: 'Média', key: 'mediaTexto', width: 14 },
+  ];
+  estilizarCabecalho(planilha.getRow(1));
+  for (const t of tempos) {
+    planilha.addRow({
+      processo: t.nome_tipo_processo,
+      etapas: t.etapas,
+      media: t.media_minutos,
+      menor: t.menor_minutos,
+      maior: t.maior_minutos,
+      mediaTexto: formatarDuracao(t.media_minutos),
+    });
+  }
+  planilha.addRow([]);
+  planilha.addRow(['Tempo corrido entre iniciar e concluir a etapa (inclui pausas, noites e fins de semana).']).font = {
+    italic: true,
+  };
+  planilha.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
 /**
  * Gera o relatório exibido na tela em .xlsx e inicia o download. A biblioteca
  * só é carregada no clique, para não pesar na abertura do site.
@@ -105,6 +133,7 @@ export async function baixarRelatorioExcel({ relatorio, filtros, geradoEm }) {
   pasta.created = geradoEm;
   montarResumo(pasta.addWorksheet('Resumo'), { resumo: relatorio.resumo, filtros, geradoEm });
   montarTabela(pasta.addWorksheet('Solicitações'), relatorio.solicitacoes);
+  montarTempos(pasta.addWorksheet('Tempo por processo'), relatorio.tempos_por_processo ?? []);
 
   const conteudo = await pasta.xlsx.writeBuffer();
   const arquivo = new Blob([conteudo], {

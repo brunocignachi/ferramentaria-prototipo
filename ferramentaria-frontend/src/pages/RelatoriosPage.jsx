@@ -7,8 +7,10 @@ import {
   STATUS_SOLICITACAO_LABEL,
   formatarData,
   formatarDataHora,
+  formatarDuracao,
   formatarPrazo,
   situacaoDoPrazo,
+  tituloDaPeca,
 } from '../utils/solicitacao';
 import { baixarRelatorioExcel } from '../utils/relatorioExcel';
 import { DATA_MAXIMA, erroData } from '../utils/validacao';
@@ -214,6 +216,45 @@ export default function RelatoriosPage() {
             </dl>
 
             <section className="card">
+              <h2>Tempo por processo</h2>
+              <p className="card__nota">
+                Do "Iniciar" ao "Concluir" das etapas concluídas destas solicitações. É tempo corrido: inclui pausas,
+                noites e fins de semana.
+              </p>
+              {relatorio.tempos_por_processo.length === 0 ? (
+                <p className="card__empty">Nenhuma etapa concluída com estes filtros.</p>
+              ) : (
+                <div className="tabela-rolagem">
+                  <table className="tabela tabela--tempos">
+                    <thead>
+                      <tr>
+                        <th className="col-quebra">Processo</th>
+                        <th className="col-fixa num">Etapas</th>
+                        <th className="col-fixa num">Média</th>
+                        <th className="col-fixa num">Menor</th>
+                        <th className="col-fixa num">Maior</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {relatorio.tempos_por_processo.map((t) => (
+                        <tr key={t.id_tipo_processo}>
+                          <td className="col-quebra">{t.nome_tipo_processo}</td>
+                          <td className="col-fixa num">{t.etapas}</td>
+                          <td className="col-fixa num">
+                            <strong>{formatarDuracao(t.media_minutos)}</strong>
+                          </td>
+                          <td className="col-fixa num">{formatarDuracao(t.menor_minutos)}</td>
+                          <td className="col-fixa num">{formatarDuracao(t.maior_minutos)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="card">
+              <h2>Solicitações</h2>
               {relatorio.solicitacoes.length === 0 ? (
                 <p className="card__empty">Nenhuma solicitação encontrada com estes filtros.</p>
               ) : (
@@ -221,7 +262,7 @@ export default function RelatoriosPage() {
                   <table className="tabela">
                     <thead>
                       <tr>
-                        <th className="col-quebra">Desenho</th>
+                        <th className="col-quebra">Peça</th>
                         <th className="col-fixa">Status</th>
                         <th className="col-fixa">Prioridade</th>
                         <th className="col-fixa">Abertura</th>
@@ -237,8 +278,9 @@ export default function RelatoriosPage() {
                         <tr key={s.id_solicitacao}>
                           <td className="col-quebra">
                             <Link className="task-link" to={`/solicitacoes/${s.id_solicitacao}`}>
-                              {s.numero_desenho}
+                              {tituloDaPeca(s)}
                             </Link>
+                            {s.descricao?.trim() && <small className="tabela__apoio">Desenho: {s.numero_desenho}</small>}
                           </td>
                           <td className="col-fixa">{STATUS_SOLICITACAO_LABEL[s.status]}</td>
                           <td className="col-fixa">{PRIORIDADE_LABEL[s.prioridade]}</td>

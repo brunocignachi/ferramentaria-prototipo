@@ -34,10 +34,40 @@ async function lerResposta(res) {
   }
 
   if (!res.ok) {
+    // Sessão que deixou de valer (usuário desativado ou token expirado):
+    // encerra a sessão aqui e o AuthContext leva ao login com o motivo.
+    if (res.status === 401 && getStoredToken() && !res.url.endsWith('/auth/login')) {
+      encerrarSessao(data?.acesso_revogado ? data.erro : 'Sua sessão expirou. Entre novamente.');
+    }
     throw new Error(data?.erro || `Erro ${res.status} ao comunicar com a API.`);
   }
 
   return data;
+}
+
+export const EVENTO_SESSAO_ENCERRADA = 'ferramentaria:sessao-encerrada';
+const CHAVE_MOTIVO = 'ferramentaria_motivo_saida';
+
+function encerrarSessao(motivo) {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.setItem(CHAVE_MOTIVO, motivo);
+  } catch {
+    // sem armazenamento: só avisa
+  }
+  window.dispatchEvent(new CustomEvent(EVENTO_SESSAO_ENCERRADA, { detail: motivo }));
+}
+
+// Motivo do último encerramento forçado, lido uma única vez pela tela de login.
+export function lerMotivoSaida() {
+  try {
+    const motivo = sessionStorage.getItem(CHAVE_MOTIVO);
+    sessionStorage.removeItem(CHAVE_MOTIVO);
+    return motivo;
+  } catch {
+    return null;
+  }
 }
 
 /**

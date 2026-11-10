@@ -93,7 +93,7 @@
   border-radius: 999px;
   padding: 10px 16px;
   color: var(--color-text);
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .checkbox {

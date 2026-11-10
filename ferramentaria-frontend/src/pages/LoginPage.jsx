@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { lerMotivoSaida } from '../api/client';
 import { IllustrationLogin } from '../components/Illustrations';
 import CampoErro from '../components/CampoErro';
 import { useValidacao } from '../hooks/useValidacao';
@@ -15,7 +16,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [manterConectado, setManterConectado] = useState(false);
-  const [erro, setErro] = useState('');
+  // Se a sessão anterior foi encerrada pela API, o motivo aparece aqui.
+  const [erro, setErro] = useState(() => lerMotivoSaida() ?? '');
   const [carregando, setCarregando] = useState(false);
 
   const erros = { email: email.trim() ? '' : 'Informe o e-mail.', senha: senha ? '' : 'Informe a senha.' };

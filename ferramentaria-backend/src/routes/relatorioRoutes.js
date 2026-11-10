@@ -6,5 +6,6 @@ const router = express.Router();
 
 router.use(autenticar);
 router.get('/solicitacoes', autorizar('administrador'), relatorioController.solicitacoes);
+router.get('/indicadores', autorizar('administrador'), relatorioController.indicadores);
 
 module.exports = router;

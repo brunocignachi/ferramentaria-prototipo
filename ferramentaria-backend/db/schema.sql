@@ -76,3 +76,16 @@ CREATE INDEX idx_solicitacao_status ON solicitacao(status);
 CREATE INDEX idx_processo_solicitacao ON processo_solicitacao(id_solicitacao);
 CREATE INDEX idx_processo_tipo_status ON processo_solicitacao(id_tipo_processo, status);
 CREATE INDEX idx_historico_entidade ON historico_status(entidade, id_entidade);
+
+-- Avisos para os usuários: etapa atribuída, solicitação cancelada ou concluída.
+CREATE TABLE IF NOT EXISTS notificacao (
+    id_notificacao SERIAL PRIMARY KEY,
+    id_usuario     INT NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+    id_solicitacao INT REFERENCES solicitacao(id_solicitacao) ON DELETE CASCADE,
+    tipo           VARCHAR(30) NOT NULL,
+    mensagem       VARCHAR(300) NOT NULL,
+    lida           BOOLEAN NOT NULL DEFAULT FALSE,
+    criada_em      TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notificacao_usuario ON notificacao(id_usuario, lida, criada_em);

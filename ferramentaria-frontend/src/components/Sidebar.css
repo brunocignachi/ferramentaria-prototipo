@@ -271,7 +271,7 @@
 
 .gaveta__link.is-active {
   background: var(--color-primary-light);
-  color: var(--color-primary-dark);
+  color: var(--color-primary-texto);
   font-weight: 600;
 }
 
@@ -288,11 +288,11 @@
 }
 
 .gaveta__sair {
-  color: #b91c1c;
+  color: var(--tom-vermelho-texto);
 }
 
 .gaveta__sair .icone {
-  color: #b91c1c;
+  color: var(--tom-vermelho-texto);
 }
 
 .gaveta__rodape .btn {
@@ -304,4 +304,61 @@
   .abas-movel {
     display: none !important;
   }
+}
+
+/* Contador de notificações não lidas. */
+.contador {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sidebar__link,
+.gaveta__link {
+  display: flex;
+  align-items: center;
+}
+
+.sidebar__link {
+  gap: 8px;
+}
+
+.barra-movel__acoes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.barra-movel__sino {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: #ffffff;
+}
+
+.barra-movel__sino .icone {
+  width: 24px;
+  height: 24px;
+}
+
+.contador--sobre {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  margin: 0;
+  box-shadow: 0 0 0 2px var(--color-primary-dark);
 }

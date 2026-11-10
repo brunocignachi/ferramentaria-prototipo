@@ -15,6 +15,8 @@ const TABELAS = [
   { nome: 'processo_solicitacao', chave: 'id_processo' },
   { nome: 'historico_status', chave: 'id_historico' },
   { nome: 'anexo', chave: 'id_anexo' },
+  // Criada depois dos primeiros backups: um arquivo antigo sem ela é restaurado com a tabela vazia.
+  { nome: 'notificacao', chave: 'id_notificacao', opcional: true },
 ];
 
 function listarBackups(diretorio = BACKUP_DIR) {
@@ -59,7 +61,7 @@ async function gerarBackup(pool, diretorio = BACKUP_DIR) {
 // Substitui todo o conteúdo do banco pelo backup, de forma atômica.
 async function restaurarBackup(pool, arquivo) {
   const { tabelas } = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
-  if (!tabelas || TABELAS.some(({ nome }) => !Array.isArray(tabelas[nome]))) {
+  if (!tabelas || TABELAS.some(({ nome, opcional }) => !opcional && !Array.isArray(tabelas[nome]))) {
     throw new Error('Arquivo de backup inválido.');
   }
 
@@ -70,7 +72,7 @@ async function restaurarBackup(pool, arquivo) {
     for (const { nome, chave } of TABELAS) {
       await client.query(
         `INSERT INTO ${nome} SELECT * FROM jsonb_populate_recordset(NULL::${nome}, $1::jsonb)`,
-        [JSON.stringify(tabelas[nome])]
+        [JSON.stringify(tabelas[nome] ?? [])]
       );
       await client.query(
         `SELECT setval(pg_get_serial_sequence('${nome}', '${chave}'),

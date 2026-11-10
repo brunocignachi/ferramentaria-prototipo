@@ -13,6 +13,7 @@ import {
   STATUS_SOLICITACAO_LABEL,
   formatarData,
   formatarPrazo,
+  tituloDaPeca,
 } from '../utils/solicitacao';
 import './DashboardPage.css';
 import '../styles/Solicitacoes.css';
@@ -113,11 +114,16 @@ export default function SolicitacaoDetalhePage() {
         {solicitacao && (
           <>
             <header className="detalhe__cabecalho">
-              <div className="detalhe__titulo">
-                <h1 className="page-title">{solicitacao.numero_desenho}</h1>
-                <span className={`badge badge--${solicitacao.status}`}>
-                  {STATUS_SOLICITACAO_LABEL[solicitacao.status]}
-                </span>
+              <div>
+                <div className="detalhe__titulo">
+                  <h1 className="page-title">{tituloDaPeca(solicitacao)}</h1>
+                  <span className={`badge badge--${solicitacao.status}`}>
+                    {STATUS_SOLICITACAO_LABEL[solicitacao.status]}
+                  </span>
+                </div>
+                {solicitacao.descricao?.trim() && (
+                  <p className="page-subtitle">Desenho: {solicitacao.numero_desenho}</p>
+                )}
               </div>
 
               {!editando && (
@@ -154,6 +160,10 @@ export default function SolicitacaoDetalhePage() {
                 />
               ) : (
                 <dl className="detalhe__dados">
+                  <div>
+                    <dt>Desenho</dt>
+                    <dd>{solicitacao.numero_desenho}</dd>
+                  </div>
                   <div>
                     <dt>Prioridade</dt>
                     <dd>{PRIORIDADE_LABEL[solicitacao.prioridade]}</dd>

@@ -101,6 +101,47 @@ export function formatarDataHora(valor) {
     : '—';
 }
 
+// Duração em minutos para leitura: "45 min", "2 h 05 min", "3 d 4 h".
+export function formatarDuracao(minutos) {
+  if (minutos === null || minutos === undefined) return '—';
+  const total = Math.round(Number(minutos));
+  if (total < 1) return 'menos de 1 min';
+  if (total < 60) return `${total} min`;
+  if (total < 24 * 60) {
+    const horas = Math.floor(total / 60);
+    const resto = total % 60;
+    return resto ? `${horas} h ${String(resto).padStart(2, '0')} min` : `${horas} h`;
+  }
+  const dias = Math.floor(total / (24 * 60));
+  const horas = Math.floor((total % (24 * 60)) / 60);
+  return horas ? `${dias} d ${horas} h` : `${dias} d`;
+}
+
+// Minutos entre o início e a conclusão de uma etapa, ou null se ela não terminou.
+export function duracaoDaEtapa(etapa) {
+  if (!etapa.data_inicio || !etapa.data_conclusao) return null;
+  return (new Date(etapa.data_conclusao) - new Date(etapa.data_inicio)) / 60000;
+}
+
+// Dia de hoje (ou daqui a N dias) no formato AAAA-MM-DD, no horário local.
+export function diaLocal(deslocamentoDias = 0) {
+  const data = new Date();
+  data.setDate(data.getDate() + deslocamentoDias);
+  const mes = String(data.getMonth() + 1).padStart(2, '0');
+  const dia = String(data.getDate()).padStart(2, '0');
+  return `${data.getFullYear()}-${mes}-${dia}`;
+}
+
+// Situação do prazo de uma solicitação ainda aberta, com as mesmas regras dos
+// indicadores do administrador: 'atrasada', 'semana' (vence em até 7 dias) ou null.
+export function prazoDaSolicitacao(s, hoje = diaLocal(), daquiUmaSemana = diaLocal(7)) {
+  if (s.status !== 'aberta' && s.status !== 'em_andamento') return null;
+  const prazo = dataParaInput(s.data_prazo);
+  if (prazo < hoje) return 'atrasada';
+  if (prazo < daquiUmaSemana) return 'semana';
+  return null;
+}
+
 // Operador só atua nas etapas atribuídas a ele; administrador atua em qualquer uma.
 export function podeAtuarNaEtapa(usuario, etapa) {
   return usuario?.perfil === 'administrador' || etapa.id_operador === usuario?.id;
