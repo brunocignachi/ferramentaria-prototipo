@@ -232,9 +232,10 @@
   color: #b91c1c;
 }
 
+/* Status: vermelho = a fazer, amarelo = em progresso, verde = completo. */
 .badge--em_andamento {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #fef9c3;
+  color: #854d0e;
 }
 
 .badge--concluida,
@@ -621,29 +622,121 @@
   border-bottom: none;
 }
 
+.so-impressao {
+  display: none;
+}
+
+/* Impressão do relatório em A4: sem menu e sem sombras, com a tabela
+   compacta para caber na largura da folha. */
 @media print {
+  @page {
+    size: A4;
+    margin: 12mm 10mm;
+  }
+
   .sidebar,
   .nao-imprimir {
     display: none !important;
   }
 
+  .so-impressao {
+    display: block;
+  }
+
+  html,
+  body,
   .dashboard {
     background: #ffffff;
+  }
+
+  .dashboard {
+    display: block;
+    min-height: 0;
+  }
+
+  .dashboard__main {
+    padding: 0;
+    gap: 12px;
+  }
+
+  .relatorio__filtros {
+    margin: 0;
+    font-size: 9pt;
+    color: var(--color-text-muted);
+  }
+
+  .indicadores {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .indicador {
+    padding: 8px 12px;
+  }
+
+  .indicador dd {
+    font-size: 16pt;
   }
 
   .card,
   .indicador {
     box-shadow: none;
     border: 1px solid var(--color-border);
+    border-radius: 6px;
+    break-inside: avoid;
   }
 
-  .tabela th,
-  .tabela td {
-    white-space: normal;
+  .card {
+    padding: 0;
+    border: none;
   }
 
   .tabela-rolagem {
     overflow: visible;
+  }
+
+  .tabela {
+    width: 100%;
+    font-size: 8pt;
+  }
+
+  /* Texto quebra só nos espaços; datas, status e prioridade ficam inteiros.
+     Só o desenho, que pode ser um código longo sem espaços, quebra em
+     qualquer ponto. */
+  .tabela th,
+  .tabela td {
+    padding: 4px 5px;
+    white-space: normal;
+    overflow-wrap: normal;
+    border-bottom: 1px solid #d1d5db;
+  }
+
+  .tabela .col-fixa {
+    white-space: nowrap;
+  }
+
+  .tabela .col-quebra {
+    overflow-wrap: anywhere;
+    min-width: 18mm;
+  }
+
+  .tabela th {
+    font-size: 7.5pt;
+    color: var(--color-text);
+    border-bottom: 1.5px solid #6b7280;
+  }
+
+  .tabela thead {
+    display: table-header-group; /* repete o cabeçalho em cada página */
+  }
+
+  .tabela tr {
+    break-inside: avoid;
+  }
+
+  .tabela a {
+    color: inherit;
+    text-decoration: none;
   }
 }
 
@@ -651,5 +744,173 @@
   .historico li {
     grid-template-columns: 1fr;
     gap: 2px;
+  }
+}
+
+/* Celular e tablet: alvos de toque maiores (≥ 44px), campos com fonte de
+   16px (evita o zoom automático do iPhone) e ações empilhadas na largura
+   da tela. */
+@media screen and (max-width: 900px) {
+  .dashboard .dashboard__main {
+    padding: 16px 16px calc(84px + env(safe-area-inset-bottom));
+    gap: 16px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 10px 18px;
+    font-size: 0.9rem;
+  }
+
+  .btn--icone {
+    min-width: 44px;
+    padding: 8px;
+  }
+
+  .dashboard__main input:not([type='checkbox']):not([type='file']),
+  .dashboard__main select,
+  .dashboard__main textarea {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .card__header button {
+    min-height: 40px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  /* Filtros ocupam a largura inteira. */
+  .page-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-filters > * {
+    width: 100%;
+  }
+
+  .dashboard__topbar input[type='search'] {
+    max-width: none;
+  }
+
+  .dashboard__date {
+    display: none;
+  }
+
+  /* Cabeçalho do detalhe: título em cima, ações divididas abaixo. */
+  .detalhe__cabecalho {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .detalhe__acoes {
+    width: 100%;
+  }
+
+  .detalhe__acoes > .btn {
+    flex: 1 1 140px;
+  }
+
+  /* Cartões de tarefa: toda a área é fácil de tocar e o botão de ação
+     ocupa a largura do cartão. */
+  .task-list__item {
+    padding: 14px;
+  }
+
+  .task-list__item--acoes {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .task-list__item--acoes > .btn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 1rem;
+  }
+
+  .task-list__item--acoes .task-list__body {
+    min-width: 0;
+  }
+
+  /* Roteiro: informações em cima, controles abaixo na largura toda. */
+  .roteiro__etapa {
+    align-items: flex-start;
+  }
+
+  .roteiro__info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .roteiro__controles {
+    width: 100%;
+  }
+
+  .roteiro__controles select {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .roteiro__controles .btn:not(.btn--icone) {
+    flex: 1;
+  }
+
+  .roteiro__adicionar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .roteiro__adicionar select {
+    min-width: 0;
+  }
+
+  /* Listas de usuários, tipos e anexos: botões abaixo, divididos. */
+  .anexos__acoes,
+  .linha__acoes {
+    width: 100%;
+  }
+
+  .anexos__acoes > .btn,
+  .linha__acoes > .btn {
+    flex: 1 1 100px;
+  }
+
+  .form-acoes > .btn {
+    flex: 1 1 160px;
+  }
+
+  .indicadores {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .indicador {
+    padding: 12px 14px;
+  }
+
+  .indicador dd {
+    font-size: 1.4rem;
+  }
+
+  /* Visualizador de desenhos em tela cheia. */
+  .visualizador {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .confirmacao__acoes > .btn {
+    flex: 1;
   }
 }

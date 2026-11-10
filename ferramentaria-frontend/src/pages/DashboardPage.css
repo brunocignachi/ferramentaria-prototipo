@@ -134,7 +134,29 @@
   font-size: 0.9rem;
 }
 
-.task-list__body span {
+.periodo-select {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface, #fff);
+  color: var(--color-text);
+}
+
+.periodo-total {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.task-list__titulo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.task-list__body > span {
   font-size: 0.82rem;
   color: var(--color-text-muted);
 }
@@ -215,4 +237,10 @@
   .task-form__row {
     flex-direction: column;
   }
+}
+
+.task-form .campo > input,
+.task-form .campo > select {
+  flex: none;
+  width: 100%;
 }

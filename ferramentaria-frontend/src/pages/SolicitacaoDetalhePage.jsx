@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { apiRequest } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useConfirmar } from '../context/ConfirmacaoContext';
 import Sidebar from '../components/Sidebar';
 import EditarSolicitacaoForm from '../components/EditarSolicitacaoForm';
 import RoteiroCard from '../components/RoteiroCard';
@@ -21,6 +22,7 @@ export default function SolicitacaoDetalhePage() {
   const { id } = useParams();
   const { usuario } = useAuth();
   const navigate = useNavigate();
+  const confirmar = useConfirmar();
   const { state: estadoDaNavegacao } = useLocation();
   const [solicitacao, setSolicitacao] = useState(null);
   const [tipos, setTipos] = useState([]);
@@ -63,9 +65,13 @@ export default function SolicitacaoDetalhePage() {
   }, [precisaDeOpcoes]);
 
   async function cancelarSolicitacao() {
-    if (!window.confirm('Cancelar esta solicitação e todas as etapas abertas? Essa ação não pode ser desfeita.')) {
-      return;
-    }
+    const confirmado = await confirmar({
+      titulo: 'Cancelar solicitação',
+      mensagem: 'A solicitação e todas as etapas abertas serão canceladas. Essa ação não pode ser desfeita.',
+      textoConfirmar: 'Cancelar solicitação',
+      perigo: true,
+    });
+    if (!confirmado) return;
     try {
       await apiRequest(`/solicitacoes/${id}`, { method: 'DELETE' });
       await carregar();
@@ -76,13 +82,13 @@ export default function SolicitacaoDetalhePage() {
 
   // RN03: exclusão física, restrita ao administrador.
   async function excluirPermanentemente() {
-    if (
-      !window.confirm(
-        'Excluir permanentemente esta solicitação, com etapas, histórico e anexos? Os dados não poderão ser recuperados.'
-      )
-    ) {
-      return;
-    }
+    const confirmado = await confirmar({
+      titulo: 'Excluir permanentemente',
+      mensagem: 'A solicitação será apagada com etapas, histórico e anexos. Os dados não poderão ser recuperados.',
+      textoConfirmar: 'Excluir',
+      perigo: true,
+    });
+    if (!confirmado) return;
     try {
       await apiRequest(`/solicitacoes/${id}/permanente`, { method: 'DELETE' });
       navigate('/solicitacoes', { replace: true });

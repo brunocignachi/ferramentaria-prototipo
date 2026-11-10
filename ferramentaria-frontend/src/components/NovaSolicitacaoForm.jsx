@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiRequest, apiUpload } from '../api/client';
 import { FORMATOS_ANEXO, formatarTamanho, validarArquivo } from '../utils/solicitacao';
+import { DATA_MAXIMA, LIMITES, erroData, erroQuantidade, erroTexto } from '../utils/validacao';
+import { useValidacao } from '../hooks/useValidacao';
+import CampoErro from './CampoErro';
 
 /**
  * Formulário de nova solicitação, acionado pelo botão "+ adicionar tarefa" do
@@ -26,6 +29,20 @@ export default function NovaSolicitacaoForm({ onCriado }) {
   const [arquivos, setArquivos] = useState([]);
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
+
+  const valores = { numeroDesenho, quantidade, descricao, dataPrazo, observacoes };
+  const erros = {
+    numeroDesenho: erroTexto(numeroDesenho, {
+      rotulo: 'Número do desenho',
+      max: LIMITES.numeroDesenho,
+      obrigatorio: true,
+    }),
+    quantidade: erroQuantidade(quantidade),
+    descricao: erroTexto(descricao, { rotulo: 'Descrição', max: LIMITES.textoLongo }),
+    dataPrazo: erroData(dataPrazo, 'Prazo'),
+    observacoes: erroTexto(observacoes, { rotulo: 'Observações', max: LIMITES.textoLongo }),
+  };
+  const { erroDe, podeEnviar } = useValidacao(erros, valores);
 
   useEffect(() => {
     Promise.all([apiRequest('/tipos-processo'), apiRequest('/usuarios/operadores')])
@@ -67,9 +84,13 @@ export default function NovaSolicitacaoForm({ onCriado }) {
   async function handleSubmit(event) {
     event.preventDefault();
     setErro('');
-    setEnviando(true);
     // Um processo escolhido sem clicar em "Incluir etapa" também entra no roteiro.
     const roteiro = incluirEtapa();
+    if (!podeEnviar()) {
+      setErro('Corrija os campos destacados para concluir o cadastro.');
+      return;
+    }
+    setEnviando(true);
     try {
       const criada = await apiRequest('/solicitacoes', {
         method: 'POST',
@@ -108,52 +129,76 @@ export default function NovaSolicitacaoForm({ onCriado }) {
   }
 
   return (
-    <form className="task-form" onSubmit={handleSubmit}>
+    <form className="task-form" onSubmit={handleSubmit} noValidate>
       <div className="task-form__row">
-        <input
-          placeholder="Número do desenho"
-          value={numeroDesenho}
-          onChange={(e) => setNumeroDesenho(e.target.value)}
-          required
-        />
-        <input
-          type="number"
-          min="1"
-          placeholder="Quantidade"
-          aria-label="Quantidade"
-          value={quantidade}
-          onChange={(e) => setQuantidade(e.target.value)}
-          required
-        />
+        <div className="campo">
+          <input
+            placeholder="Número do desenho"
+            aria-label="Número do desenho"
+            value={numeroDesenho}
+            aria-invalid={!!erroDe('numeroDesenho')}
+            onChange={(e) => setNumeroDesenho(e.target.value)}
+          />
+          <CampoErro mensagem={erroDe('numeroDesenho')} />
+        </div>
+        <div className="campo">
+          <input
+            type="number"
+            min="1"
+            max={LIMITES.quantidadeMaxima}
+            placeholder="Quantidade"
+            aria-label="Quantidade"
+            value={quantidade}
+            aria-invalid={!!erroDe('quantidade')}
+            onChange={(e) => setQuantidade(e.target.value)}
+          />
+          <CampoErro mensagem={erroDe('quantidade')} />
+        </div>
       </div>
 
-      <input
-        placeholder="Descrição"
-        value={descricao}
-        onChange={(e) => setDescricao(e.target.value)}
-      />
-
-      <div className="task-form__row">
-        <select aria-label="Prioridade" value={prioridade} onChange={(e) => setPrioridade(e.target.value)}>
-          <option value="urgente">Urgente</option>
-          <option value="alta">Alta</option>
-          <option value="normal">Normal</option>
-          <option value="baixa">Baixa</option>
-        </select>
+      <div className="campo">
         <input
-          type="date"
-          aria-label="Prazo"
-          value={dataPrazo}
-          onChange={(e) => setDataPrazo(e.target.value)}
-          required
+          placeholder="Descrição (nome da peça)"
+          aria-label="Descrição"
+          value={descricao}
+          aria-invalid={!!erroDe('descricao')}
+          onChange={(e) => setDescricao(e.target.value)}
         />
+        <CampoErro mensagem={erroDe('descricao')} />
       </div>
 
-      <input
-        placeholder="Observações"
-        value={observacoes}
-        onChange={(e) => setObservacoes(e.target.value)}
-      />
+      <div className="task-form__row">
+        <div className="campo">
+          <select aria-label="Prioridade" value={prioridade} onChange={(e) => setPrioridade(e.target.value)}>
+            <option value="urgente">Urgente</option>
+            <option value="alta">Alta</option>
+            <option value="normal">Normal</option>
+            <option value="baixa">Baixa</option>
+          </select>
+        </div>
+        <div className="campo">
+          <input
+            type="date"
+            aria-label="Prazo"
+            max={DATA_MAXIMA}
+            value={dataPrazo}
+            aria-invalid={!!erroDe('dataPrazo')}
+            onChange={(e) => setDataPrazo(e.target.value)}
+          />
+          <CampoErro mensagem={erroDe('dataPrazo')} />
+        </div>
+      </div>
+
+      <div className="campo">
+        <input
+          placeholder="Observações"
+          aria-label="Observações"
+          value={observacoes}
+          aria-invalid={!!erroDe('observacoes')}
+          onChange={(e) => setObservacoes(e.target.value)}
+        />
+        <CampoErro mensagem={erroDe('observacoes')} />
+      </div>
 
       <fieldset className="task-form__secao">
         <legend>Roteiro</legend>

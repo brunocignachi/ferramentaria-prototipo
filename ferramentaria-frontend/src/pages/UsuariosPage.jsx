@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useConfirmar } from '../context/ConfirmacaoContext';
+import { useValidacao } from '../hooks/useValidacao';
 import Sidebar from '../components/Sidebar';
+import CampoErro from '../components/CampoErro';
+import { LIMITES, erroEmail, erroSenha, erroTexto } from '../utils/validacao';
 import './DashboardPage.css';
 import '../styles/Solicitacoes.css';
 
@@ -13,11 +17,19 @@ function FormularioUsuario({ alvo, ehProprio, onSalvo, onCancelar }) {
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
 
+  const erros = {
+    nome: erroTexto(campos.nome, { rotulo: 'Nome', max: LIMITES.nomeUsuario, obrigatorio: true }),
+    email: erroEmail(campos.email),
+    senha: erroSenha(campos.senha, { obrigatoria: false }),
+  };
+  const { erroDe, podeEnviar } = useValidacao(erros, campos);
+
   const alterar = (campo, valor) => setCampos((atuais) => ({ ...atuais, [campo]: valor }));
 
   async function handleSubmit(event) {
     event.preventDefault();
     setErro('');
+    if (!podeEnviar()) return;
     setEnviando(true);
     try {
       const { senha, ...dados } = campos;
@@ -33,15 +45,26 @@ function FormularioUsuario({ alvo, ehProprio, onSalvo, onCancelar }) {
   }
 
   return (
-    <form className="linha-edicao" onSubmit={handleSubmit}>
+    <form className="linha-edicao" onSubmit={handleSubmit} noValidate>
       <div className="form-campos">
         <label>
           Nome
-          <input value={campos.nome} onChange={(e) => alterar('nome', e.target.value)} required />
+          <input
+            value={campos.nome}
+            aria-invalid={!!erroDe('nome')}
+            onChange={(e) => alterar('nome', e.target.value)}
+          />
+          <CampoErro mensagem={erroDe('nome')} />
         </label>
         <label>
           E-mail
-          <input type="email" value={campos.email} onChange={(e) => alterar('email', e.target.value)} required />
+          <input
+            type="email"
+            value={campos.email}
+            aria-invalid={!!erroDe('email')}
+            onChange={(e) => alterar('email', e.target.value)}
+          />
+          <CampoErro mensagem={erroDe('email')} />
         </label>
         <label>
           Perfil
@@ -57,11 +80,12 @@ function FormularioUsuario({ alvo, ehProprio, onSalvo, onCancelar }) {
           Nova senha (opcional)
           <input
             type="password"
-            minLength={6}
             autoComplete="new-password"
             value={campos.senha}
+            aria-invalid={!!erroDe('senha')}
             onChange={(e) => alterar('senha', e.target.value)}
           />
+          <CampoErro mensagem={erroDe('senha')} />
         </label>
       </div>
 
@@ -82,6 +106,7 @@ function FormularioUsuario({ alvo, ehProprio, onSalvo, onCancelar }) {
 // Gestão de usuários e perfis de acesso (RF10, UC15, E12, RN03).
 export default function UsuariosPage() {
   const { usuario } = useAuth();
+  const confirmar = useConfirmar();
   const [usuarios, setUsuarios] = useState([]);
   const [idEmEdicao, setIdEmEdicao] = useState(null);
   const [carregando, setCarregando] = useState(true);
@@ -112,7 +137,13 @@ export default function UsuariosPage() {
   }
 
   async function excluir(alvo) {
-    if (!window.confirm(`Excluir permanentemente o usuário "${alvo.nome}"?`)) return;
+    const confirmado = await confirmar({
+      titulo: 'Excluir usuário',
+      mensagem: `O usuário "${alvo.nome}" será excluído permanentemente. Se ele já tiver registros no sistema, use Desativar.`,
+      textoConfirmar: 'Excluir',
+      perigo: true,
+    });
+    if (!confirmado) return;
     try {
       await apiRequest(`/usuarios/${alvo.id_usuario}`, { method: 'DELETE' });
       await carregar();

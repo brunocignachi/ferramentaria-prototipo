@@ -9,11 +9,22 @@ import {
   PRIORIDADE_COR,
   PRIORIDADE_LABEL,
   STATUS_SOLICITACAO_LABEL,
+  correspondeABusca,
   formatarData,
   formatarPrazo,
+  subtituloDaPeca,
+  tituloDaPeca,
 } from '../utils/solicitacao';
 import './DashboardPage.css';
 import '../styles/Solicitacoes.css';
+
+// Filtro do gráfico "Situação Atual", pela data de abertura da solicitação.
+const PERIODOS = {
+  semana: { rotulo: 'Última semana', dias: 7 },
+  mes: { rotulo: 'Último mês', dias: 30 },
+  ano: { rotulo: 'Último ano', dias: 365 },
+  todos: { rotulo: 'Todo o período', dias: null },
+};
 
 export default function DashboardPage() {
   const { usuario } = useAuth();
@@ -23,6 +34,13 @@ export default function DashboardPage() {
   const [erro, setErro] = useState('');
   const [mostrarForm, setMostrarForm] = useState(false);
   const [busca, setBusca] = useState('');
+  // A data de corte é calculada na troca do filtro, não a cada renderização.
+  const [periodo, setPeriodo] = useState({ chave: 'todos', inicio: null });
+
+  function escolherPeriodo(chave) {
+    const { dias } = PERIODOS[chave];
+    setPeriodo({ chave, inicio: dias ? Date.now() - dias * 24 * 60 * 60 * 1000 : null });
+  }
 
   // Só solicitante/administrador têm permissão no backend para criar
   // solicitações (ver solicitacaoRoutes.js) — operador só consulta a fila.
@@ -54,23 +72,29 @@ export default function DashboardPage() {
     () =>
       ativas
         .filter((s) => s.status !== 'concluida')
-        .filter((s) => (busca ? s.numero_desenho.toLowerCase().includes(busca.toLowerCase()) : true)),
+        .filter((s) => correspondeABusca(s, busca)),
     [ativas, busca]
   );
 
   const concluidas = useMemo(() => ativas.filter((s) => s.status === 'concluida').slice(0, 5), [ativas]);
 
+  // Situação atual das solicitações abertas dentro do período escolhido.
+  const doPeriodo = useMemo(() => {
+    if (periodo.inicio === null) return ativas;
+    return ativas.filter((s) => new Date(s.data_abertura).getTime() >= periodo.inicio);
+  }, [ativas, periodo]);
+
   const totais = useMemo(() => {
-    const total = ativas.length || 1;
-    const completo = ativas.filter((s) => s.status === 'concluida').length;
-    const progresso = ativas.filter((s) => s.status === 'em_andamento').length;
-    const aFazer = ativas.filter((s) => s.status === 'aberta').length;
+    const total = doPeriodo.length || 1;
+    const completo = doPeriodo.filter((s) => s.status === 'concluida').length;
+    const progresso = doPeriodo.filter((s) => s.status === 'em_andamento').length;
+    const aFazer = doPeriodo.filter((s) => s.status === 'aberta').length;
     return {
       completo: Math.round((completo / total) * 100),
       progresso: Math.round((progresso / total) * 100),
       aFazer: Math.round((aFazer / total) * 100),
     };
-  }, [ativas]);
+  }, [doPeriodo]);
 
   const hoje = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -87,7 +111,7 @@ export default function DashboardPage() {
         <header className="dashboard__topbar">
           <input
             type="search"
-            placeholder="Pesquisar por desenho..."
+            placeholder="Pesquisar por descrição ou desenho..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
           />
@@ -123,15 +147,17 @@ export default function DashboardPage() {
                   <li key={s.id_solicitacao} className="task-list__item">
                     <span className="task-list__dot" style={{ background: PRIORIDADE_COR[s.prioridade] }} />
                     <div className="task-list__body">
-                      <strong>
-                        <Link className="task-link" to={`/solicitacoes/${s.id_solicitacao}`}>
-                          {s.numero_desenho}
-                        </Link>
-                      </strong>
-                      <span>{s.descricao || 'Sem descrição'}</span>
+                      <div className="task-list__titulo">
+                        <strong>
+                          <Link className="task-link" to={`/solicitacoes/${s.id_solicitacao}`}>
+                            {tituloDaPeca(s)}
+                          </Link>
+                        </strong>
+                        <span className={`badge badge--${s.status}`}>{STATUS_SOLICITACAO_LABEL[s.status]}</span>
+                      </div>
+                      <span>{subtituloDaPeca(s)}</span>
                       <small>
-                        Prioridade: {PRIORIDADE_LABEL[s.prioridade]} · Status: {STATUS_SOLICITACAO_LABEL[s.status]} ·
-                        Prazo: {formatarPrazo(s.data_prazo)}
+                        Prioridade: {PRIORIDADE_LABEL[s.prioridade]} · Prazo: {formatarPrazo(s.data_prazo)}
                       </small>
                     </div>
                   </li>
@@ -142,12 +168,31 @@ export default function DashboardPage() {
 
           <div className="dashboard__side">
             <section className="card">
-              <h2>Situação Atual</h2>
+              <div className="card__header">
+                <h2>Situação Atual</h2>
+                <select
+                  className="periodo-select"
+                  aria-label="Período da situação atual"
+                  value={periodo.chave}
+                  onChange={(e) => escolherPeriodo(e.target.value)}
+                >
+                  {Object.entries(PERIODOS).map(([valor, { rotulo }]) => (
+                    <option key={valor} value={valor}>
+                      {rotulo}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="rings">
                 <ProgressRing value={totais.completo} color="#16a34a" label="Completo" />
-                <ProgressRing value={totais.progresso} color="#2563eb" label="Em progresso" />
+                <ProgressRing value={totais.progresso} color="#eab308" label="Em progresso" />
                 <ProgressRing value={totais.aFazer} color="#ef4444" label="A fazer" />
               </div>
+              <p className="card__empty periodo-total">
+                {doPeriodo.length === 0
+                  ? 'Nenhuma solicitação aberta neste período.'
+                  : `${doPeriodo.length} ${doPeriodo.length === 1 ? 'solicitação' : 'solicitações'} no período`}
+              </p>
             </section>
 
             <section className="card">
@@ -160,10 +205,12 @@ export default function DashboardPage() {
                     <li key={s.id_solicitacao}>
                       <strong>
                         <Link className="task-link" to={`/solicitacoes/${s.id_solicitacao}`}>
-                          {s.numero_desenho}
+                          {tituloDaPeca(s)}
                         </Link>
                       </strong>
-                      <span>Quantidade: {s.quantidade}</span>
+                      <span>
+                        {s.descricao?.trim() ? `Desenho: ${s.numero_desenho} · ` : ''}Quantidade: {s.quantidade}
+                      </span>
                       <small>Concluída em {formatarData(s.data_conclusao)}</small>
                     </li>
                   ))}

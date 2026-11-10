@@ -12,6 +12,7 @@
 
 .register-page {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -70,8 +71,13 @@
 }
 
 .field__icon {
-  opacity: 0.55;
-  line-height: 1;
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-muted);
+}
+
+.field:focus-within .field__icon {
+  color: var(--color-primary);
 }
 
 .select-field {
@@ -164,6 +170,22 @@
   }
 
   .auth-card__form {
-    padding: 36px 28px;
+    flex-basis: auto;
+    padding: 32px 22px;
+  }
+
+  .auth-page {
+    padding: 16px;
+  }
+
+  /* Dentro do sistema, a tela de cadastro deixa espaço para as abas de baixo. */
+  .register-page {
+    align-items: flex-start;
+    padding: 16px 16px calc(84px + env(safe-area-inset-bottom));
+  }
+
+  .field input,
+  .select-field select {
+    font-size: 16px;
   }
 }

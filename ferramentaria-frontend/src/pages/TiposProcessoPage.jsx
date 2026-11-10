@@ -1,30 +1,74 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../api/client';
+import { useConfirmar } from '../context/ConfirmacaoContext';
+import { useValidacao } from '../hooks/useValidacao';
 import Sidebar from '../components/Sidebar';
+import CampoErro from '../components/CampoErro';
+import { LIMITES, erroTexto } from '../utils/validacao';
 import './DashboardPage.css';
 import '../styles/Solicitacoes.css';
 
-function CamposTipo({ campos, onAlterar }) {
+// Formulário de criação e de edição de um tipo de processo.
+function FormularioTipo({ inicial, textoEnviar, onEnviar, onCancelar, ocupado }) {
+  const [campos, setCampos] = useState(inicial);
+  const erros = {
+    nome: erroTexto(campos.nome, { rotulo: 'Nome', max: LIMITES.nomeTipo, obrigatorio: true }),
+    descricao: erroTexto(campos.descricao, { rotulo: 'Descrição', max: LIMITES.descricaoTipo }),
+  };
+  const { erroDe, podeEnviar, reiniciar } = useValidacao(erros, campos);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!podeEnviar()) return;
+    if (await onEnviar(campos)) {
+      setCampos(inicial);
+      reiniciar();
+    }
+  }
+
   return (
-    <div className="form-campos">
-      <label>
-        Nome
-        <input value={campos.nome} onChange={(e) => onAlterar({ ...campos, nome: e.target.value })} required />
-      </label>
-      <label>
-        Descrição (opcional)
-        <input value={campos.descricao} onChange={(e) => onAlterar({ ...campos, descricao: e.target.value })} />
-      </label>
-    </div>
+    <form className={onCancelar ? 'linha-edicao' : undefined} onSubmit={handleSubmit} noValidate>
+      <div className="form-campos">
+        <label>
+          Nome
+          <input
+            value={campos.nome}
+            aria-invalid={!!erroDe('nome')}
+            onChange={(e) => setCampos({ ...campos, nome: e.target.value })}
+          />
+          <CampoErro mensagem={erroDe('nome')} />
+        </label>
+        <label>
+          Descrição (opcional)
+          <input
+            value={campos.descricao}
+            aria-invalid={!!erroDe('descricao')}
+            onChange={(e) => setCampos({ ...campos, descricao: e.target.value })}
+          />
+          <CampoErro mensagem={erroDe('descricao')} />
+        </label>
+      </div>
+      <div className="form-acoes">
+        <button type="submit" className="btn btn--primario" disabled={ocupado}>
+          {textoEnviar}
+        </button>
+        {onCancelar && (
+          <button type="button" className="btn" disabled={ocupado} onClick={onCancelar}>
+            Voltar sem salvar
+          </button>
+        )}
+      </div>
+    </form>
   );
 }
 
-// Cadastro dos tipos de processo produtivo (RF11, UC16, E11). Tipos saem de uso
-// por desativação, porque as etapas já registradas continuam apontando para eles.
+// Cadastro dos tipos de processo produtivo (RF11, UC16, E11). Um tipo que nunca
+// entrou em um roteiro pode ser excluído; os já usados só podem ser
+// desativados, porque as etapas registradas continuam apontando para eles.
 export default function TiposProcessoPage() {
+  const confirmar = useConfirmar();
   const [tipos, setTipos] = useState([]);
-  const [novo, setNovo] = useState({ nome: '', descricao: '' });
-  const [emEdicao, setEmEdicao] = useState(null);
+  const [idEmEdicao, setIdEmEdicao] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
@@ -44,40 +88,37 @@ export default function TiposProcessoPage() {
     carregar();
   }, [carregar]);
 
+  // Devolve true quando a ação deu certo.
   async function executar(acao) {
     setOcupado(true);
     setErro('');
     try {
       await acao();
       await carregar();
+      return true;
     } catch (err) {
       setErro(err.message);
+      return false;
     } finally {
       setOcupado(false);
     }
-  }
-
-  function criar(event) {
-    event.preventDefault();
-    executar(async () => {
-      await apiRequest('/tipos-processo', { method: 'POST', body: novo });
-      setNovo({ nome: '', descricao: '' });
-    });
-  }
-
-  function salvarEdicao(event) {
-    event.preventDefault();
-    const { id, ...campos } = emEdicao;
-    executar(async () => {
-      await apiRequest(`/tipos-processo/${id}`, { method: 'PATCH', body: campos });
-      setEmEdicao(null);
-    });
   }
 
   function alternarAtivo(tipo) {
     executar(() =>
       apiRequest(`/tipos-processo/${tipo.id_tipo_processo}`, { method: 'PATCH', body: { ativo: !tipo.ativo } })
     );
+  }
+
+  async function excluir(tipo) {
+    const confirmado = await confirmar({
+      titulo: 'Excluir tipo de processo',
+      mensagem: `"${tipo.nome}" será excluído permanentemente e deixará de aparecer na lista.`,
+      textoConfirmar: 'Excluir',
+      perigo: true,
+    });
+    if (!confirmado) return;
+    executar(() => apiRequest(`/tipos-processo/${tipo.id_tipo_processo}`, { method: 'DELETE' }));
   }
 
   return (
@@ -87,21 +128,22 @@ export default function TiposProcessoPage() {
       <main className="dashboard__main">
         <header>
           <h1 className="page-title">Tipos de processo</h1>
-          <p className="page-subtitle">Processos disponíveis para montar o roteiro das peças.</p>
+          <p className="page-subtitle">
+            Processos disponíveis para montar o roteiro das peças. Os que já foram usados em algum roteiro não podem
+            ser excluídos, só desativados.
+          </p>
         </header>
 
         {erro && <p className="dashboard__error">{erro}</p>}
 
         <section className="card">
           <h2>Novo tipo de processo</h2>
-          <form onSubmit={criar}>
-            <CamposTipo campos={novo} onAlterar={setNovo} />
-            <div className="form-acoes">
-              <button type="submit" className="btn btn--primario" disabled={ocupado}>
-                Adicionar tipo
-              </button>
-            </div>
-          </form>
+          <FormularioTipo
+            inicial={{ nome: '', descricao: '' }}
+            textoEnviar="Adicionar tipo"
+            ocupado={ocupado}
+            onEnviar={(campos) => executar(() => apiRequest('/tipos-processo', { method: 'POST', body: campos }))}
+          />
         </section>
 
         <section className="card">
@@ -114,23 +156,28 @@ export default function TiposProcessoPage() {
             <ul className="linhas">
               {tipos.map((tipo) => (
                 <li key={tipo.id_tipo_processo}>
-                  {emEdicao?.id === tipo.id_tipo_processo ? (
-                    <form className="linha-edicao" onSubmit={salvarEdicao}>
-                      <CamposTipo campos={emEdicao} onAlterar={setEmEdicao} />
-                      <div className="form-acoes">
-                        <button type="submit" className="btn btn--primario" disabled={ocupado}>
-                          Salvar alterações
-                        </button>
-                        <button type="button" className="btn" disabled={ocupado} onClick={() => setEmEdicao(null)}>
-                          Voltar sem salvar
-                        </button>
-                      </div>
-                    </form>
+                  {idEmEdicao === tipo.id_tipo_processo ? (
+                    <FormularioTipo
+                      inicial={{ nome: tipo.nome, descricao: tipo.descricao ?? '' }}
+                      textoEnviar="Salvar alterações"
+                      ocupado={ocupado}
+                      onCancelar={() => setIdEmEdicao(null)}
+                      onEnviar={async (campos) => {
+                        const salvo = await executar(() =>
+                          apiRequest(`/tipos-processo/${tipo.id_tipo_processo}`, { method: 'PATCH', body: campos })
+                        );
+                        if (salvo) setIdEmEdicao(null);
+                        return salvo;
+                      }}
+                    />
                   ) : (
                     <div className="linha">
                       <div className="linha__info">
                         <strong>{tipo.nome}</strong>
-                        <small>{tipo.descricao || 'Sem descrição'}</small>
+                        <small>
+                          {tipo.descricao || 'Sem descrição'}
+                          {tipo.em_uso ? ' · usado em roteiros' : ''}
+                        </small>
                       </div>
                       <span className={`badge ${tipo.ativo ? 'badge--concluida' : ''}`}>
                         {tipo.ativo ? 'Ativo' : 'Inativo'}
@@ -140,19 +187,23 @@ export default function TiposProcessoPage() {
                           type="button"
                           className="btn"
                           disabled={ocupado}
-                          onClick={() =>
-                            setEmEdicao({
-                              id: tipo.id_tipo_processo,
-                              nome: tipo.nome,
-                              descricao: tipo.descricao ?? '',
-                            })
-                          }
+                          onClick={() => setIdEmEdicao(tipo.id_tipo_processo)}
                         >
                           Editar
                         </button>
                         <button type="button" className="btn" disabled={ocupado} onClick={() => alternarAtivo(tipo)}>
                           {tipo.ativo ? 'Desativar' : 'Ativar'}
                         </button>
+                        {!tipo.em_uso && (
+                          <button
+                            type="button"
+                            className="btn btn--perigo"
+                            disabled={ocupado}
+                            onClick={() => excluir(tipo)}
+                          >
+                            Excluir
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiRequest } from '../api/client';
+import { useConfirmar } from '../context/ConfirmacaoContext';
 import { STATUS_ETAPA_LABEL, formatarDataHora, podeAtuarNaEtapa } from '../utils/solicitacao';
 
 // Roteiro de fabricação da peça (RF04, RF05). A ordem é própria de cada
@@ -9,6 +10,7 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
   const [idOperador, setIdOperador] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
+  const confirmar = useConfirmar();
 
   const { processos: etapas } = solicitacao;
   const ativa = solicitacao.status === 'aberta' || solicitacao.status === 'em_andamento';
@@ -67,6 +69,17 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
         body: { id_operador: Number(novoOperador) },
       })
     );
+  }
+
+  async function removerEtapa(etapa) {
+    const confirmado = await confirmar({
+      titulo: 'Remover etapa',
+      mensagem: `A etapa ${etapa.ordem_execucao} (${etapa.nome_tipo_processo}) sairá do roteiro e as seguintes sobem uma posição.`,
+      textoConfirmar: 'Remover etapa',
+      perigo: true,
+    });
+    if (!confirmado) return;
+    executar(() => apiRequest(`/processos/${etapa.id_processo}`, { method: 'DELETE' }));
   }
 
   function alterarStatus(idProcesso, acao) {
@@ -146,6 +159,18 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
                     </>
                   )}
 
+                  {ativa && ehPendente && usuario?.perfil === 'administrador' && (
+                    <button
+                      type="button"
+                      className="btn btn--perigo"
+                      aria-label={`Remover etapa ${etapa.ordem_execucao}`}
+                      disabled={ocupado}
+                      onClick={() => removerEtapa(etapa)}
+                    >
+                      Remover
+                    </button>
+                  )}
+
                   {daVez && etapa.status === 'pendente' && etapa.id_operador && podeAtuar && (
                     <button
                       type="button"
@@ -178,12 +203,11 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
       {erro && <p className="field-error">{erro}</p>}
 
       {podeEditar && (
-        <form className="roteiro__adicionar" onSubmit={adicionarEtapa}>
+        <form className="roteiro__adicionar" onSubmit={adicionarEtapa} noValidate>
           <select
             aria-label="Processo da nova etapa"
             value={idTipo}
             onChange={(e) => setIdTipo(e.target.value)}
-            required
           >
             <option value="" disabled>
               Processo
@@ -206,7 +230,7 @@ export default function RoteiroCard({ solicitacao, usuario, podeGerenciar, tipos
               </option>
             ))}
           </select>
-          <button type="submit" className="btn btn--primario" disabled={ocupado}>
+          <button type="submit" className="btn btn--primario" disabled={ocupado || !idTipo}>
             Adicionar etapa
           </button>
         </form>

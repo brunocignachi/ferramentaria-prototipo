@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { apiDownload, apiRequest, apiUpload } from '../api/client';
 import VisualizadorAnexo from './VisualizadorAnexo';
+import { useConfirmar } from '../context/ConfirmacaoContext';
 import { FORMATOS_ANEXO, formatarDataHora, formatarTamanho, tipoVisualizavel } from '../utils/solicitacao';
 
 // Desenhos técnicos da solicitação (RF03, UC06).
@@ -9,6 +10,7 @@ export default function AnexosCard({ idSolicitacao, anexos, podeEditar, onAltera
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState('');
   const [emVisualizacao, setEmVisualizacao] = useState(null);
+  const confirmar = useConfirmar();
 
   async function executar(acao) {
     setOcupado(true);
@@ -34,8 +36,14 @@ export default function AnexosCard({ idSolicitacao, anexos, podeEditar, onAltera
     });
   }
 
-  function remover(anexo) {
-    if (!window.confirm(`Remover o anexo "${anexo.nome_arquivo}"?`)) return;
+  async function remover(anexo) {
+    const confirmado = await confirmar({
+      titulo: 'Remover desenho',
+      mensagem: `O arquivo "${anexo.nome_arquivo}" será removido desta solicitação.`,
+      textoConfirmar: 'Remover',
+      perigo: true,
+    });
+    if (!confirmado) return;
     executar(async () => {
       await apiRequest(`/anexos/${anexo.id_anexo}`, { method: 'DELETE' });
       await onAlterado();

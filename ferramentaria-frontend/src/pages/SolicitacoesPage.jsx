@@ -6,7 +6,10 @@ import {
   PRIORIDADE_COR,
   PRIORIDADE_LABEL,
   STATUS_SOLICITACAO_LABEL,
+  correspondeABusca,
   formatarPrazo,
+  subtituloDaPeca,
+  tituloDaPeca,
 } from '../utils/solicitacao';
 import './DashboardPage.css';
 import '../styles/Solicitacoes.css';
@@ -42,7 +45,7 @@ export default function SolicitacoesPage() {
   }, [status]);
 
   const visiveis = useMemo(
-    () => solicitacoes.filter((s) => s.numero_desenho.toLowerCase().includes(busca.toLowerCase())),
+    () => solicitacoes.filter((s) => correspondeABusca(s, busca)),
     [solicitacoes, busca]
   );
 
@@ -59,8 +62,8 @@ export default function SolicitacoesPage() {
         <div className="page-filters">
           <input
             type="search"
-            aria-label="Pesquisar por desenho"
-            placeholder="Pesquisar por desenho..."
+            aria-label="Pesquisar por descrição ou desenho"
+            placeholder="Pesquisar por descrição ou desenho..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
           />
@@ -91,15 +94,18 @@ export default function SolicitacoesPage() {
                 <li key={s.id_solicitacao} className="task-list__item">
                   <span className="task-list__dot" style={{ background: PRIORIDADE_COR[s.prioridade] }} />
                   <div className="task-list__body">
-                    <strong>
-                      <Link className="task-link" to={`/solicitacoes/${s.id_solicitacao}`}>
-                        {s.numero_desenho}
-                      </Link>
-                    </strong>
-                    <span>{s.descricao || 'Sem descrição'}</span>
+                    <div className="task-list__titulo">
+                      <strong>
+                        <Link className="task-link" to={`/solicitacoes/${s.id_solicitacao}`}>
+                          {tituloDaPeca(s)}
+                        </Link>
+                      </strong>
+                      <span className={`badge badge--${s.status}`}>{STATUS_SOLICITACAO_LABEL[s.status]}</span>
+                    </div>
+                    <span>{subtituloDaPeca(s)}</span>
                     <small>
-                      Prioridade: {PRIORIDADE_LABEL[s.prioridade]} · Status: {STATUS_SOLICITACAO_LABEL[s.status]} ·
-                      Prazo: {formatarPrazo(s.data_prazo)} · Solicitante: {s.nome_solicitante}
+                      Prioridade: {PRIORIDADE_LABEL[s.prioridade]} · Prazo: {formatarPrazo(s.data_prazo)} · Solicitante:{' '}
+                      {s.nome_solicitante}
                     </small>
                   </div>
                 </li>

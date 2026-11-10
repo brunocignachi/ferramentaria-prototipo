@@ -34,6 +34,29 @@ export function formatarTamanho(bytes) {
   return `${(valor / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
 }
 
+// Nome principal da peça nas listas: a descrição, ou o desenho quando não há descrição.
+export function tituloDaPeca(s) {
+  return s.descricao?.trim() || s.numero_desenho;
+}
+
+// Situação do prazo mostrada no relatório (tela, impressão e Excel).
+export function situacaoDoPrazo(s) {
+  if (s.status === 'cancelada') return '—';
+  if (s.status === 'concluida') return s.concluida_no_prazo ? 'No prazo' : 'Com atraso';
+  return s.em_atraso ? 'Em atraso' : 'Dentro do prazo';
+}
+
+// Linha de apoio abaixo do título: o desenho, quando o título é a descrição.
+export function subtituloDaPeca(s) {
+  return s.descricao?.trim() ? `Desenho: ${s.numero_desenho}` : 'Sem descrição';
+}
+
+export function correspondeABusca(s, busca) {
+  const termo = busca.trim().toLowerCase();
+  if (!termo) return true;
+  return [s.descricao, s.numero_desenho].some((campo) => campo?.toLowerCase().includes(termo));
+}
+
 export const PRIORIDADE_LABEL = { urgente: 'Urgente', alta: 'Alta', normal: 'Normal', baixa: 'Baixa' };
 export const PRIORIDADE_COR = { urgente: '#ef4444', alta: '#f59e0b', normal: '#2563eb', baixa: '#9ca3af' };
 
