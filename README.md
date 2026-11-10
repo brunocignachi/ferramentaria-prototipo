@@ -24,8 +24,7 @@ npm run dev
 ```
 
 Na primeira vez, crie o banco com `npm run db:migrate` e `npm run db:seed` na pasta
-do back-end. O seed cria o administrador `admin@ferramentaria.local` com a senha
-`admin123`, que serve apenas para desenvolvimento e deve ser trocada em qualquer
+do back-end. O seed cria o administrador `admin@ferramentaria.local`, que serve apenas para desenvolvimento e deve ser trocada em qualquer
 outro ambiente.
 
 ## Abrir pelo celular
